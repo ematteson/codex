@@ -445,6 +445,7 @@ mod search;
 mod thread_processor;
 mod token_usage_replay;
 mod turn_processor;
+mod upload_sftp;
 mod windows_sandbox_processor;
 
 pub(crate) use account_processor::AccountRequestProcessor;

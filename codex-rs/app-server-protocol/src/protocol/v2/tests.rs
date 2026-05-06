@@ -665,6 +665,25 @@ fn fs_read_file_params_round_trip() {
 }
 
 #[test]
+fn fs_create_upload_params_round_trip() {
+    let params = FsCreateUploadParams {
+        file_name: "example.bin".to_string(),
+    };
+
+    let value = serde_json::to_value(&params).expect("serialize fs/createUpload params");
+    assert_eq!(
+        value,
+        json!({
+            "fileName": "example.bin",
+        })
+    );
+
+    let decoded = serde_json::from_value::<FsCreateUploadParams>(value)
+        .expect("deserialize fs/createUpload params");
+    assert_eq!(decoded, params);
+}
+
+#[test]
 fn device_key_create_params_round_trip_uses_protection_policy() {
     let params = DeviceKeyCreateParams {
         protection_policy: None,
