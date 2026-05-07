@@ -45,6 +45,14 @@ enum Command {
         #[command(subcommand)]
         target: ShowTarget,
     },
+    /// Print the composed system prompt for a mode (debug aid).
+    ///
+    /// Shows base invariants + mode prompt as the runtime would feed them to
+    /// the model. Useful for verifying the governance layer end-to-end.
+    Prompt {
+        /// Mode whose composed prompt to print.
+        mode: String,
+    },
     /// Run mode evals.
     Eval {
         /// Mode to evaluate, or `all`.
@@ -94,6 +102,37 @@ fn main() -> Result<()> {
             ShowTarget::Patterns => not_yet_implemented("show patterns"),
         },
         Command::Eval { target, .. } => not_yet_implemented(&format!("eval {target}")),
+        Command::Prompt { mode } => print_prompt(&mode),
+    }
+}
+
+fn print_prompt(mode_name: &str) -> Result<()> {
+    use selfwork_core::Mode;
+    use selfwork_core::ModeBundle;
+
+    let mode = match mode_name.to_ascii_lowercase().as_str() {
+        "explore" => Mode::Explore,
+        "plan" => Mode::Plan,
+        "reflect" => Mode::Reflect,
+        "program" => Mode::Program,
+        "review" => Mode::Review,
+        other => {
+            anyhow::bail!(
+                "unknown mode `{other}` (expected one of: explore | plan | reflect | program | review)"
+            );
+        }
+    };
+    match ModeBundle::for_mode(mode) {
+        Some(bundle) => {
+            print!("{}", bundle.render_system_prompt());
+            Ok(())
+        }
+        None => {
+            anyhow::bail!(
+                "mode `{}` is not yet implemented in this build (Step 1 ships Explore only)",
+                mode.display_name()
+            );
+        }
     }
 }
 

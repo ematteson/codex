@@ -9,10 +9,17 @@
 //!
 //! See `selfworkDesignSpec.md` at the repo root for the full v1 design.
 //!
-//! Step 0: scaffolding only. Subsequent steps fill in mode bundles,
-//! governance enforcement, handoff compiler, and the eval harness.
+//! Step 1 (current): governance layer. Base invariants and mode prompts ship
+//! as embedded resources via `include_str!`; [`ModeBundle::render_system_prompt`]
+//! composes them in the order spec §2.2 requires (invariants on top, mode
+//! prompt below). Subsequent steps add filesystem ACLs, handoff schemas,
+//! and the eval harness.
+
+pub mod modes;
+
+pub use modes::Mode;
+pub use modes::ModeBundle;
 
 /// Crate-version helper used by the CLI to keep the binary `--version` line
-/// in sync with the library it links against. Real functionality lands in
-/// later steps.
+/// in sync with the library it links against.
 pub const SELFWORK_VERSION: &str = env!("CARGO_PKG_VERSION");
