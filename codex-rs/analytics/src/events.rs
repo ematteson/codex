@@ -261,7 +261,7 @@ pub struct GuardianReviewTrackContext {
     approval_request_source: GuardianApprovalRequestSource,
     reviewed_action: GuardianReviewedAction,
     review_timeout_ms: u64,
-    started_at: u64,
+    pub started_at_ms: u64,
     started_instant: Instant,
 }
 
@@ -283,7 +283,7 @@ impl GuardianReviewTrackContext {
             approval_request_source,
             reviewed_action,
             review_timeout_ms,
-            started_at: now_unix_seconds(),
+            started_at_ms: crate::now_unix_millis(),
             started_instant: Instant::now(),
         }
     }
@@ -316,7 +316,7 @@ impl GuardianReviewTrackContext {
             tool_call_count: None,
             time_to_first_token_ms: result.time_to_first_token_ms,
             completion_latency_ms: Some(self.started_instant.elapsed().as_millis() as u64),
-            started_at: self.started_at,
+            started_at: self.started_at_ms / 1_000,
             completed_at: Some(now_unix_seconds()),
             input_tokens: result.token_usage.as_ref().map(|usage| usage.input_tokens),
             cached_input_tokens: result
