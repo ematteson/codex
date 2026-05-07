@@ -37,6 +37,7 @@ pub enum SlashCommand {
     Init,
     Compact,
     Plan,
+    Explore,
     Goal,
     Collab,
     Agent,
@@ -113,6 +114,7 @@ impl SlashCommand {
             SlashCommand::Realtime => "toggle realtime voice mode (experimental)",
             SlashCommand::Settings => "configure realtime microphone/speaker",
             SlashCommand::Plan => "switch to Plan mode",
+            SlashCommand::Explore => "switch to Explore mode",
             SlashCommand::Goal => "set or view the goal for a long-running task",
             SlashCommand::Collab => "change collaboration mode (experimental)",
             SlashCommand::Agent | SlashCommand::MultiAgents => "switch the active agent thread",
@@ -150,6 +152,7 @@ impl SlashCommand {
             SlashCommand::Review
                 | SlashCommand::Rename
                 | SlashCommand::Plan
+                | SlashCommand::Explore
                 | SlashCommand::Goal
                 | SlashCommand::Fast
                 | SlashCommand::Ide
@@ -193,6 +196,7 @@ impl SlashCommand {
             | SlashCommand::Memories
             | SlashCommand::Review
             | SlashCommand::Plan
+            | SlashCommand::Explore
             | SlashCommand::Clear
             | SlashCommand::Logout
             | SlashCommand::MemoryDrop

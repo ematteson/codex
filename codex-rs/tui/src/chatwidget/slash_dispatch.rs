@@ -81,6 +81,26 @@ impl ChatWidget {
         }
     }
 
+    fn apply_explore_slash_command(&mut self) -> bool {
+        if !self.collaboration_modes_enabled() {
+            self.add_info_message(
+                "Collaboration modes are disabled.".to_string(),
+                Some("Enable collaboration modes to use /explore.".to_string()),
+            );
+            return false;
+        }
+        if let Some(mask) = collaboration_modes::explore_mask(self.model_catalog.as_ref()) {
+            self.set_collaboration_mask(mask);
+            true
+        } else {
+            self.add_info_message(
+                "Explore mode unavailable right now.".to_string(),
+                /*hint*/ None,
+            );
+            false
+        }
+    }
+
     fn request_side_conversation(
         &mut self,
         parent_thread_id: ThreadId,
@@ -206,6 +226,9 @@ impl ChatWidget {
             }
             SlashCommand::Plan => {
                 self.apply_plan_slash_command();
+            }
+            SlashCommand::Explore => {
+                self.apply_explore_slash_command();
             }
             SlashCommand::Goal => {
                 if !self.config.features.enabled(Feature::Goals) {
@@ -615,6 +638,27 @@ impl ChatWidget {
                     self.queue_user_message(user_message);
                 }
             }
+            SlashCommand::Explore if !trimmed.is_empty() => {
+                if !self.apply_explore_slash_command() {
+                    return;
+                }
+                let user_message = self.prepared_inline_user_message(
+                    args,
+                    text_elements,
+                    local_images,
+                    remote_image_urls,
+                    mention_bindings,
+                    source,
+                );
+                if self.is_session_configured() {
+                    self.reasoning_buffer.clear();
+                    self.full_reasoning_buffer.clear();
+                    self.set_status_header(String::from("Working"));
+                    self.submit_user_message(user_message);
+                } else {
+                    self.queue_user_message(user_message);
+                }
+            }
             SlashCommand::Goal if !trimmed.is_empty() => {
                 if !self.config.features.enabled(Feature::Goals) {
                     return;
@@ -870,6 +914,7 @@ impl ChatWidget {
             | SlashCommand::Settings
             | SlashCommand::Personality
             | SlashCommand::Plan
+            | SlashCommand::Explore
             | SlashCommand::Goal
             | SlashCommand::Collab
             | SlashCommand::Side
