@@ -11326,6 +11326,7 @@ name = "selfwork-cli"
 version = "0.0.0"
 dependencies = [
  "anyhow",
+ "chrono",
  "clap",
  "selfwork-core",
 ]

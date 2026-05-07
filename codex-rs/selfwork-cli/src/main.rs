@@ -95,7 +95,7 @@ fn main() -> Result<()> {
         Command::Init => init_workspace(),
         Command::Status => not_yet_implemented("status"),
         Command::Journal { target } => match target {
-            JournalTarget::Today => not_yet_implemented("journal today"),
+            JournalTarget::Today => journal_today(),
         },
         Command::Show { target } => match target {
             ShowTarget::Commitments => not_yet_implemented("show commitments"),
@@ -141,6 +141,37 @@ fn not_yet_implemented(command: &str) -> Result<()> {
         "selfwork: `{command}` is scaffolded but not yet implemented. \
          Step 0 of the migration plan ships the CLI surface; later steps fill in behavior."
     );
+    Ok(())
+}
+
+fn discover_or_hint() -> Result<selfwork_core::SelfworkRoot> {
+    let cwd = std::env::current_dir()?;
+    selfwork_core::discover_root(&cwd).ok_or_else(|| {
+        anyhow::anyhow!("no .selfwork/ workspace found upward from current directory; run `selfwork init` first")
+    })
+}
+
+fn journal_today() -> Result<()> {
+    let root = discover_or_hint()?;
+    let today = chrono::Local::now().date_naive();
+    let entry = selfwork_core::ensure_journal_entry(&root, today)?;
+    if entry.created {
+        eprintln!("selfwork: created {}", entry.path.display());
+    }
+    println!("{}", entry.path.display());
+    if let Ok(editor) = std::env::var("EDITOR") {
+        if !editor.is_empty() {
+            match std::process::Command::new(&editor).arg(&entry.path).status() {
+                Ok(status) if status.success() => {}
+                Ok(status) => {
+                    anyhow::bail!("$EDITOR ({editor}) exited with status {status}")
+                }
+                Err(err) => {
+                    eprintln!("selfwork: failed to launch $EDITOR ({editor}): {err}");
+                }
+            }
+        }
+    }
     Ok(())
 }
 

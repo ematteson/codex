@@ -16,11 +16,14 @@
 //! and the eval harness.
 
 pub mod bootstrap;
+pub mod journal;
 pub mod modes;
 pub mod workspace;
 
 pub use bootstrap::BootstrapReport;
 pub use bootstrap::bootstrap_workspace;
+pub use journal::JournalEntry;
+pub use journal::ensure_journal_entry;
 pub use modes::Mode;
 pub use modes::ModeBundle;
 pub use workspace::SelfworkRoot;
