@@ -68,6 +68,8 @@ members = [
     "responses-api-proxy",
     "response-debug-context",
     "sandboxing",
+    "selfwork-cli",
+    "selfwork-core",
     "stdio-to-uds",
     "otel",
     "tui",
@@ -191,6 +193,8 @@ codex-rollout = { path = "rollout" }
 codex-rollout-trace = { path = "rollout-trace" }
 codex-sandboxing = { path = "sandboxing" }
 codex-secrets = { path = "secrets" }
+selfwork-cli = { path = "selfwork-cli" }
+selfwork-core = { path = "selfwork-core" }
 codex-shell-command = { path = "shell-command" }
 codex-shell-escalation = { path = "shell-escalation" }
 codex-skills = { path = "skills" }

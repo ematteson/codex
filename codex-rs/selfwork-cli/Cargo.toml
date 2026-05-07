@@ -1,0 +1,17 @@
+[package]
+edition.workspace = true
+license.workspace = true
+name = "selfwork-cli"
+version.workspace = true
+
+[[bin]]
+name = "selfwork"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = { workspace = true }
+clap = { workspace = true, features = ["derive"] }
+selfwork-core = { workspace = true }
+
+[lints]
+workspace = true
