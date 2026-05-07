@@ -1,4 +1,5 @@
 use codex_collaboration_mode_templates::DEFAULT as COLLABORATION_MODE_DEFAULT;
+use codex_collaboration_mode_templates::EXPLORE as COLLABORATION_MODE_EXPLORE;
 use codex_collaboration_mode_templates::PLAN as COLLABORATION_MODE_PLAN;
 use codex_protocol::config_types::CollaborationModeMask;
 use codex_protocol::config_types::ModeKind;
@@ -14,7 +15,11 @@ static COLLABORATION_MODE_DEFAULT_TEMPLATE: LazyLock<Template> = LazyLock::new(|
 });
 
 pub fn builtin_collaboration_mode_presets() -> Vec<CollaborationModeMask> {
-    vec![plan_preset(), default_preset()]
+    // Order is meaningful: it controls the Shift+Tab cycle order. With Default
+    // at the end, BackTab from Default wraps to Plan first (preserving the
+    // pre-Explore behavior that the plan-mode nudge depends on), then to
+    // Explore on the next press, then back to Default.
+    vec![plan_preset(), explore_preset(), default_preset()]
 }
 
 fn plan_preset() -> CollaborationModeMask {
@@ -34,6 +39,16 @@ fn default_preset() -> CollaborationModeMask {
         model: None,
         reasoning_effort: None,
         developer_instructions: Some(Some(default_mode_instructions())),
+    }
+}
+
+fn explore_preset() -> CollaborationModeMask {
+    CollaborationModeMask {
+        name: ModeKind::Explore.display_name().to_string(),
+        mode: Some(ModeKind::Explore),
+        model: None,
+        reasoning_effort: Some(Some(ReasoningEffort::High)),
+        developer_instructions: Some(Some(COLLABORATION_MODE_EXPLORE.to_string())),
     }
 }
 
