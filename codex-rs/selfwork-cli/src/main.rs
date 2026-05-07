@@ -92,7 +92,7 @@ fn main() -> Result<()> {
         Command::Reflect => not_yet_implemented("reflect"),
         Command::Program => not_yet_implemented("program"),
         Command::Review => not_yet_implemented("review"),
-        Command::Init => not_yet_implemented("init"),
+        Command::Init => init_workspace(),
         Command::Status => not_yet_implemented("status"),
         Command::Journal { target } => match target {
             JournalTarget::Today => not_yet_implemented("journal today"),
@@ -141,5 +141,35 @@ fn not_yet_implemented(command: &str) -> Result<()> {
         "selfwork: `{command}` is scaffolded but not yet implemented. \
          Step 0 of the migration plan ships the CLI surface; later steps fill in behavior."
     );
+    Ok(())
+}
+
+fn init_workspace() -> Result<()> {
+    let cwd = std::env::current_dir()?;
+    let report = selfwork_core::bootstrap_workspace(&cwd)?;
+    if report.root_already_existed {
+        if report.nothing_was_created() {
+            println!(
+                "selfwork: workspace at {} already up to date.",
+                report.root.display()
+            );
+        } else {
+            println!(
+                "selfwork: workspace at {} topped up.",
+                report.root.display()
+            );
+        }
+    } else {
+        println!(
+            "selfwork: initialized workspace at {}.",
+            report.root.display()
+        );
+    }
+    if !report.created_directories.is_empty() {
+        println!("  directories created: {}", report.created_directories.len());
+    }
+    if !report.created_files.is_empty() {
+        println!("  files seeded:        {}", report.created_files.len());
+    }
     Ok(())
 }

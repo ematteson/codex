@@ -10,8 +10,8 @@
 //! this ordering by always emitting invariants first, separated from the
 //! mode prompt by a blank line.
 
-const BASE_INVARIANTS: &str = include_str!("../resources/base/invariants.md");
-const EXPLORE_PROMPT: &str = include_str!("../resources/modes/explore/prompt.md");
+pub(crate) const BASE_INVARIANTS: &str = include_str!("../resources/base/invariants.md");
+pub(crate) const EXPLORE_PROMPT: &str = include_str!("../resources/modes/explore/prompt.md");
 
 /// The five modes specified for selfwork v1. Plan, Reflect, Program, and
 /// Review are declared but their bundles arrive in later migration steps.

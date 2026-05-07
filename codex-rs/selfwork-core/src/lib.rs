@@ -15,9 +15,12 @@
 //! prompt below). Subsequent steps add filesystem ACLs, handoff schemas,
 //! and the eval harness.
 
+pub mod bootstrap;
 pub mod modes;
 pub mod workspace;
 
+pub use bootstrap::BootstrapReport;
+pub use bootstrap::bootstrap_workspace;
 pub use modes::Mode;
 pub use modes::ModeBundle;
 pub use workspace::SelfworkRoot;
