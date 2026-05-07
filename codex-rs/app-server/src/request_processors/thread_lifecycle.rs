@@ -286,6 +286,16 @@ pub(super) async fn ensure_listener_task_running(
                         thread_state.track_current_turn_event(&event.id, &event.msg);
                         thread_state.experimental_raw_events
                     };
+                    if matches!(
+                        &event.msg,
+                        EventMsg::TurnAborted(_)
+                            | EventMsg::TurnComplete(_)
+                            | EventMsg::RealtimeConversationStarted(_)
+                    ) {
+                        thread_state_manager
+                            .clear_attestation_request_connection(&event.id)
+                            .await;
+                    }
                     let subscribed_connection_ids = thread_state_manager
                         .subscribed_connection_ids(conversation_id)
                         .await;

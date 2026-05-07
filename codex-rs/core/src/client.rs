@@ -231,6 +231,7 @@ pub struct ModelClient {
 pub struct ModelClientSession {
     client: ModelClient,
     websocket_session: WebsocketSession,
+    attestation_request_id: Option<String>,
     /// Turn state for sticky routing.
     ///
     /// This is an `OnceLock` that stores the turn state value received from the server
@@ -255,6 +256,7 @@ struct WebsocketSession {
     connection: Option<ApiWebSocketConnection>,
     last_request: Option<ResponsesApiRequest>,
     last_response_rx: Option<oneshot::Receiver<LastResponse>>,
+    attestation_request_id: Option<String>,
     connection_reused: StdMutex<bool>,
 }
 
@@ -355,6 +357,7 @@ impl ModelClient {
         ModelClientSession {
             client: self.clone(),
             websocket_session: self.take_cached_websocket_session(),
+            attestation_request_id: None,
             turn_state: Arc::new(OnceLock::new()),
         }
     }
@@ -433,6 +436,7 @@ impl ModelClient {
         settings: CompactConversationRequestSettings,
         session_telemetry: &SessionTelemetry,
         compaction_trace: &CompactionTraceContext,
+        attestation_request_id: Option<&str>,
     ) -> Result<Vec<ResponseItem>> {
         if prompt.input.is_empty() {
             return Ok(Vec::new());
@@ -495,8 +499,12 @@ impl ModelClient {
             Some(self.state.session_id.to_string()),
             Some(self.state.thread_id.to_string()),
         ));
-        self.extend_attestation_header_for(&mut extra_headers, &client_setup.api_provider)
-            .await;
+        self.extend_attestation_header_for(
+            &mut extra_headers,
+            &client_setup.api_provider,
+            attestation_request_id,
+        )
+        .await;
         let client =
             ApiCompactClient::new(transport, client_setup.api_provider, client_setup.api_auth)
                 .with_telemetry(Some(request_telemetry));
@@ -514,12 +522,17 @@ impl ModelClient {
         sdp: String,
         session_config: ApiRealtimeSessionConfig,
         mut extra_headers: ApiHeaderMap,
+        attestation_request_id: Option<&str>,
     ) -> Result<RealtimeWebrtcCallStart> {
         // Create the media call over HTTP first, then retain matching auth so realtime can attach
         // the server-side control WebSocket to the call id from that HTTP response.
         let client_setup = self.current_client_setup().await?;
-        self.extend_attestation_header_for(&mut extra_headers, &client_setup.api_provider)
-            .await;
+        self.extend_attestation_header_for(
+            &mut extra_headers,
+            &client_setup.api_provider,
+            attestation_request_id,
+        )
+        .await;
         let mut sideband_headers = extra_headers.clone();
         sideband_headers.extend(sideband_websocket_auth_headers(
             client_setup.api_auth.as_ref(),
@@ -653,12 +666,14 @@ impl ModelClient {
     async fn generate_attestation_header_for(
         &self,
         provider: &codex_api::Provider,
+        attestation_request_id: Option<&str>,
     ) -> Option<HeaderValue> {
         self.state
             .attestation_provider
             .as_ref()?
             .header_for_request(AttestationContext {
                 uses_chatgpt_auth: provider.uses_chatgpt_auth,
+                request_id: attestation_request_id.map(ToOwned::to_owned),
             })
             .await
     }
@@ -797,11 +812,17 @@ impl ModelClient {
         api_auth: SharedAuthProvider,
         turn_state: Option<Arc<OnceLock<String>>>,
         turn_metadata_header: Option<&str>,
+        attestation_request_id: Option<&str>,
         auth_context: AuthRequestTelemetryContext,
         request_route_telemetry: RequestRouteTelemetry,
     ) -> std::result::Result<ApiWebSocketConnection, ApiError> {
         let headers = self
-            .build_websocket_headers(&api_provider, turn_state.as_ref(), turn_metadata_header)
+            .build_websocket_headers(
+                &api_provider,
+                turn_state.as_ref(),
+                turn_metadata_header,
+                attestation_request_id,
+            )
             .await;
         let websocket_telemetry = ModelClientSession::build_websocket_telemetry(
             session_telemetry,
@@ -884,6 +905,7 @@ impl ModelClient {
         provider: &codex_api::Provider,
         turn_state: Option<&Arc<OnceLock<String>>>,
         turn_metadata_header: Option<&str>,
+        attestation_request_id: Option<&str>,
     ) -> ApiHeaderMap {
         let turn_metadata_header = parse_turn_metadata_header(turn_metadata_header);
         let session_id = self.state.session_id.to_string();
@@ -898,7 +920,7 @@ impl ModelClient {
         }
         headers.extend(build_session_headers(Some(session_id), Some(thread_id)));
         headers.extend(self.build_responses_identity_headers());
-        self.extend_attestation_header_for(&mut headers, provider)
+        self.extend_attestation_header_for(&mut headers, provider, attestation_request_id)
             .await;
         headers.insert(
             OPENAI_BETA_HEADER,
@@ -923,10 +945,27 @@ impl Drop for ModelClientSession {
 }
 
 impl ModelClientSession {
+    pub(crate) fn with_attestation_request_id(mut self, request_id: String) -> Self {
+        if self.client.state.attestation_provider.is_some()
+            && self.websocket_session.connection.is_some()
+            && self.websocket_session.attestation_request_id.is_none()
+        {
+            self.reset_websocket_session();
+        }
+        self.attestation_request_id = Some(request_id);
+        self
+    }
+
+    pub(crate) fn can_reuse_for_attestation_request(&self, _request_id: &str) -> bool {
+        self.client.state.attestation_provider.is_none()
+            || self.websocket_session.attestation_request_id.is_some()
+    }
+
     pub(crate) fn reset_websocket_session(&mut self) {
         self.websocket_session.connection = None;
         self.websocket_session.last_request = None;
         self.websocket_session.last_response_rx = None;
+        self.websocket_session.attestation_request_id = None;
         self.websocket_session
             .set_connection_reused(/*connection_reused*/ false);
     }
@@ -969,7 +1008,11 @@ impl ModelClientSession {
                 );
                 headers.extend(self.client.build_responses_identity_headers());
                 self.client
-                    .extend_attestation_header_for(&mut headers, provider)
+                    .extend_attestation_header_for(
+                        &mut headers,
+                        provider,
+                        self.attestation_request_id.as_deref(),
+                    )
                     .await;
                 headers
             },
@@ -1088,11 +1131,13 @@ impl ModelClientSession {
                 client_setup.api_auth,
                 Some(Arc::clone(&self.turn_state)),
                 /*turn_metadata_header*/ None,
+                self.attestation_request_id.as_deref(),
                 auth_context,
                 RequestRouteTelemetry::for_endpoint(RESPONSES_ENDPOINT),
             )
             .await?;
         self.websocket_session.connection = Some(connection);
+        self.websocket_session.attestation_request_id = self.attestation_request_id.clone();
         self.websocket_session
             .set_connection_reused(/*connection_reused*/ false);
         Ok(())
@@ -1143,6 +1188,7 @@ impl ModelClientSession {
                     api_auth,
                     Some(turn_state),
                     turn_metadata_header,
+                    self.attestation_request_id.as_deref(),
                     auth_context,
                     request_route_telemetry,
                 )
@@ -1157,6 +1203,7 @@ impl ModelClientSession {
                 }
             };
             self.websocket_session.connection = Some(new_conn);
+            self.websocket_session.attestation_request_id = self.attestation_request_id.clone();
             self.websocket_session
                 .set_connection_reused(/*connection_reused*/ false);
         } else {
@@ -1675,8 +1722,12 @@ impl ModelClient {
         &self,
         headers: &mut ApiHeaderMap,
         provider: &codex_api::Provider,
+        attestation_request_id: Option<&str>,
     ) {
-        if let Some(header_value) = self.generate_attestation_header_for(provider).await {
+        if let Some(header_value) = self
+            .generate_attestation_header_for(provider, attestation_request_id)
+            .await
+        {
             headers.insert(X_OAI_ATTESTATION_HEADER, header_value);
         }
     }

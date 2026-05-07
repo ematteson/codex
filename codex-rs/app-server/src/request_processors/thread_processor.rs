@@ -923,9 +923,32 @@ impl ThreadRequestProcessor {
         thread: &CodexThread,
         op: Op,
     ) -> CodexResult<String> {
-        thread
-            .submit_with_trace(op, self.request_trace_context(request_id).await)
+        let submission_id = Uuid::now_v7().to_string();
+        let tracks_attestation = matches!(&op, Op::Compact);
+        if tracks_attestation {
+            self.thread_state_manager
+                .record_attestation_request_connection(
+                    submission_id.clone(),
+                    request_id.connection_id,
+                )
+                .await;
+        }
+        if let Err(err) = thread
+            .submit_with_id(Submission {
+                id: submission_id.clone(),
+                op,
+                trace: self.request_trace_context(request_id).await,
+            })
             .await
+        {
+            if tracks_attestation {
+                self.thread_state_manager
+                    .clear_attestation_request_connection(&submission_id)
+                    .await;
+            }
+            return Err(err);
+        }
+        Ok(submission_id)
     }
 
     #[allow(clippy::too_many_arguments)]

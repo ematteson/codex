@@ -48,10 +48,12 @@ impl AttestationProvider for AppServerAttestationProvider {
             if !context.uses_chatgpt_auth {
                 return None;
             }
+            let request_id = context.request_id?;
 
             request_attestation_header_value_with_timeout(
                 outgoing,
                 thread_state_manager,
+                &request_id,
                 ATTESTATION_GENERATE_TIMEOUT,
             )
             .await
@@ -63,10 +65,11 @@ impl AttestationProvider for AppServerAttestationProvider {
 async fn request_attestation_header_value_with_timeout(
     outgoing: Arc<OutgoingMessageSender>,
     thread_state_manager: ThreadStateManager,
+    request_id: &str,
     timeout_duration: Duration,
 ) -> Option<String> {
     let connection_id = thread_state_manager
-        .first_attestation_capable_connection()
+        .attestation_connection_for_request(request_id)
         .await?;
 
     let connection_ids = [connection_id];

@@ -229,6 +229,7 @@ struct RealtimeStart {
     extra_headers: Option<HeaderMap>,
     session_config: RealtimeSessionConfig,
     model_client: ModelClient,
+    attestation_request_id: String,
     sdp: Option<String>,
 }
 
@@ -281,6 +282,7 @@ impl RealtimeConversationManager {
             extra_headers,
             session_config,
             model_client,
+            attestation_request_id,
             sdp,
         } = start;
         let event_parser = session_config.event_parser;
@@ -313,6 +315,7 @@ impl RealtimeConversationManager {
                     sdp,
                     session_config.clone(),
                     extra_headers.unwrap_or_default(),
+                    Some(attestation_request_id.as_str()),
                 )
                 .await?;
             let task = spawn_webrtc_sideband_input_task(RealtimeWebrtcSidebandInputTask {
@@ -789,6 +792,7 @@ async fn handle_start_inner(
         extra_headers,
         session_config,
         model_client: sess.services.model_client.clone(),
+        attestation_request_id: sub_id.to_string(),
         sdp,
     };
     let start_output = sess.conversation.start(start).await?;

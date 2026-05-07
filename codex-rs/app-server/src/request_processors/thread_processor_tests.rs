@@ -1279,35 +1279,46 @@ mod thread_processor_behavior_tests {
     }
 
     #[tokio::test]
-    async fn first_attestation_capable_connection_returns_lowest_live_connection_id() {
+    async fn attestation_connection_for_request_uses_the_initiating_connection() {
         let manager = ThreadStateManager::new();
         let unsupported_connection = ConnectionId(1);
-        let later_supported_connection = ConnectionId(3);
-        let earlier_supported_connection = ConnectionId(2);
+        let supported_connection = ConnectionId(2);
 
         manager
             .connection_initialized(unsupported_connection, ConnectionCapabilities::default())
             .await;
         manager
             .connection_initialized(
-                later_supported_connection,
+                supported_connection,
                 ConnectionCapabilities {
                     request_attestation: true,
                 },
             )
             .await;
         manager
-            .connection_initialized(
-                earlier_supported_connection,
-                ConnectionCapabilities {
-                    request_attestation: true,
-                },
+            .record_attestation_request_connection(
+                "unsupported-turn".to_string(),
+                unsupported_connection,
+            )
+            .await;
+        manager
+            .record_attestation_request_connection(
+                "supported-turn".to_string(),
+                supported_connection,
             )
             .await;
 
         assert_eq!(
-            manager.first_attestation_capable_connection().await,
-            Some(earlier_supported_connection)
+            manager
+                .attestation_connection_for_request("unsupported-turn")
+                .await,
+            None
+        );
+        assert_eq!(
+            manager
+                .attestation_connection_for_request("supported-turn")
+                .await,
+            Some(supported_connection)
         );
     }
 }

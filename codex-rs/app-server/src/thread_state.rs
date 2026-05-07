@@ -200,6 +200,7 @@ impl ThreadEntry {
 #[derive(Default)]
 struct ThreadStateManagerInner {
     live_connections: HashMap<ConnectionId, ConnectionCapabilities>,
+    attestation_connection_ids_by_request_id: HashMap<String, ConnectionId>,
     threads: HashMap<ThreadId, ThreadEntry>,
     thread_ids_by_connection: HashMap<ConnectionId, HashSet<ThreadId>>,
 }
@@ -231,16 +232,39 @@ impl ThreadStateManager {
             .insert(connection_id, capabilities);
     }
 
-    pub(crate) async fn first_attestation_capable_connection(&self) -> Option<ConnectionId> {
+    pub(crate) async fn record_attestation_request_connection(
+        &self,
+        request_id: String,
+        connection_id: ConnectionId,
+    ) {
         self.state
             .lock()
             .await
+            .attestation_connection_ids_by_request_id
+            .insert(request_id, connection_id);
+    }
+
+    pub(crate) async fn attestation_connection_for_request(
+        &self,
+        request_id: &str,
+    ) -> Option<ConnectionId> {
+        let state = self.state.lock().await;
+        let connection_id = state
+            .attestation_connection_ids_by_request_id
+            .get(request_id)?;
+        state
             .live_connections
-            .iter()
-            .filter_map(|(connection_id, capabilities)| {
-                capabilities.request_attestation.then_some(*connection_id)
-            })
-            .min_by_key(|connection_id| connection_id.0)
+            .get(connection_id)?
+            .request_attestation
+            .then_some(*connection_id)
+    }
+
+    pub(crate) async fn clear_attestation_request_connection(&self, request_id: &str) {
+        self.state
+            .lock()
+            .await
+            .attestation_connection_ids_by_request_id
+            .remove(request_id);
     }
 
     pub(crate) async fn subscribed_connection_ids(&self, thread_id: ThreadId) -> Vec<ConnectionId> {
@@ -405,6 +429,9 @@ impl ThreadStateManager {
         {
             let mut state = self.state.lock().await;
             state.live_connections.remove(&connection_id);
+            state
+                .attestation_connection_ids_by_request_id
+                .retain(|_, request_connection_id| *request_connection_id != connection_id);
             let thread_ids = state
                 .thread_ids_by_connection
                 .remove(&connection_id)

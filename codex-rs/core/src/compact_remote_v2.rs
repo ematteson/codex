@@ -195,7 +195,11 @@ async fn run_remote_compact_task_inner_impl(
         )
         .await
     } else {
-        let mut owned_client_session = sess.services.model_client.new_session();
+        let mut owned_client_session = sess
+            .services
+            .model_client
+            .new_session()
+            .with_attestation_request_id(turn_context.sub_id.clone());
         run_remote_compaction_request_v2(
             sess,
             turn_context,

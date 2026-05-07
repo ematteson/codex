@@ -541,7 +541,10 @@ async fn websocket_handshake_includes_attestation_for_chatgpt_codex_responses() 
 
     let headers = model_client
         .build_websocket_headers(
-            &provider, /*turn_state*/ None, /*turn_metadata_header*/ None,
+            &provider,
+            /*turn_state*/ None,
+            /*turn_metadata_header*/ None,
+            Some("turn-1"),
         )
         .await;
 
@@ -561,15 +564,15 @@ async fn non_chatgpt_codex_endpoints_omit_attestation_generation() {
     let mut response_headers = http::HeaderMap::new();
 
     model_client
-        .extend_attestation_header_for(&mut response_headers, &provider)
+        .extend_attestation_header_for(&mut response_headers, &provider, Some("turn-1"))
         .await;
     let mut compaction_headers = http::HeaderMap::new();
     model_client
-        .extend_attestation_header_for(&mut compaction_headers, &provider)
+        .extend_attestation_header_for(&mut compaction_headers, &provider, Some("turn-1"))
         .await;
     let mut realtime_headers = http::HeaderMap::new();
     model_client
-        .extend_attestation_header_for(&mut realtime_headers, &provider)
+        .extend_attestation_header_for(&mut realtime_headers, &provider, Some("turn-1"))
         .await;
 
     assert_eq!(

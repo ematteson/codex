@@ -10,9 +10,12 @@ pub type GenerateAttestationFuture<'a> =
 
 /// Request context that host integrations can use when deciding whether to
 /// generate an attestation header value.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 pub struct AttestationContext {
     pub uses_chatgpt_auth: bool,
+    /// Stable submission identifier for the upstream request's originating work item, when one
+    /// exists.
+    pub request_id: Option<String>,
 }
 
 /// Host integration boundary for just-in-time attestation header values.

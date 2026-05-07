@@ -1035,8 +1035,13 @@ impl Session {
                     anyhow::bail!("required MCP servers failed to initialize: {details}");
                 }
             }
-            sess.schedule_startup_prewarm(session_configuration.base_instructions.clone())
-                .await;
+            // Startup prewarm has no originating submission to bind host-provided attestation to.
+            // When attestation is enabled, wait for the first real turn so its websocket handshake
+            // can use that turn's request-scoped attestation context.
+            if sess.services.attestation_provider.is_none() {
+                sess.schedule_startup_prewarm(session_configuration.base_instructions.clone())
+                    .await;
+            }
             let session_start_source = match &initial_history {
                 InitialHistory::Resumed(_) => codex_hooks::SessionStartSource::Resume,
                 InitialHistory::New | InitialHistory::Forked(_) => {
