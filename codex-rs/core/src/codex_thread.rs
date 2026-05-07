@@ -97,6 +97,9 @@ pub enum TryStartTurnIfIdleRejectionReason {
     /// The thread is in Plan mode, where idle work without user input must not
     /// start a new model turn.
     PlanMode,
+    /// The thread is in Explore mode, where automatic idle work must not start
+    /// a new model turn.
+    ExploreMode,
     /// Another turn or task is active, or the idle reservation was lost before
     /// the automatic turn could start.
     Busy,

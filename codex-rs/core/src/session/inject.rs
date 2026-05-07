@@ -41,9 +41,9 @@ impl Session {
     ///
     /// This is the shared gate for extension-initiated idle work. It refuses to
     /// start a turn when user/client-triggered work is queued or any task is
-    /// still active. Work without user input is also rejected in Plan mode.
-    /// Active Review tasks are covered by the active-task check because Review
-    /// turns are not steerable.
+    /// still active. Work without user input is also rejected in Plan and
+    /// Explore mode. Active Review tasks are covered by the active-task check
+    /// because Review turns are not steerable.
     pub(crate) async fn try_start_turn_if_idle(
         self: &Arc<Self>,
         input: Vec<TurnInput>,
@@ -60,11 +60,11 @@ impl Session {
                 input,
             ));
         }
-        if !has_user_input && self.collaboration_mode().await.mode == ModeKind::Plan {
-            return Err(TryStartTurnIfIdleError::new(
-                TryStartTurnIfIdleRejectionReason::PlanMode,
-                input,
-            ));
+        if !has_user_input
+            && let Some(reason) =
+                automatic_idle_rejection_reason(self.collaboration_mode().await.mode)
+        {
+            return Err(TryStartTurnIfIdleError::new(reason, input));
         }
 
         let turn_state = {
@@ -91,13 +91,12 @@ impl Session {
         let turn_context = self
             .new_default_turn_with_sub_id(uuid::Uuid::new_v4().to_string())
             .await;
-        if !has_user_input && turn_context.mode == ModeKind::Plan {
+        if !has_user_input
+            && let Some(reason) = automatic_idle_rejection_reason(turn_context.mode)
+        {
             self.clear_reserved_idle_turn(&turn_state).await;
             self.maybe_start_turn_for_pending_work().await;
-            return Err(TryStartTurnIfIdleError::new(
-                TryStartTurnIfIdleRejectionReason::PlanMode,
-                input,
-            ));
+            return Err(TryStartTurnIfIdleError::new(reason, input));
         }
         self.maybe_emit_model_warnings_for_turn(turn_context.as_ref())
             .await;
@@ -175,5 +174,13 @@ impl Session {
             }
         };
         self.record_conversation_items(turn_context, &items).await;
+    }
+}
+
+fn automatic_idle_rejection_reason(mode: ModeKind) -> Option<TryStartTurnIfIdleRejectionReason> {
+    match mode {
+        ModeKind::Plan => Some(TryStartTurnIfIdleRejectionReason::PlanMode),
+        ModeKind::Explore => Some(TryStartTurnIfIdleRejectionReason::ExploreMode),
+        ModeKind::Default => None,
     }
 }
