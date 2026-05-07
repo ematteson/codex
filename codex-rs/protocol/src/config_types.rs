@@ -583,6 +583,7 @@ pub enum ModeKind {
         alias = "custom"
     )]
     Default,
+    Explore,
     #[doc(hidden)]
     #[serde(skip_serializing, skip_deserializing)]
     #[schemars(skip)]
@@ -595,24 +596,26 @@ pub enum ModeKind {
     Execute,
 }
 
-pub const TUI_VISIBLE_COLLABORATION_MODES: [ModeKind; 2] = [ModeKind::Default, ModeKind::Plan];
+pub const TUI_VISIBLE_COLLABORATION_MODES: [ModeKind; 3] =
+    [ModeKind::Default, ModeKind::Plan, ModeKind::Explore];
 
 impl ModeKind {
     pub const fn display_name(self) -> &'static str {
         match self {
             Self::Plan => "Plan",
             Self::Default => "Default",
+            Self::Explore => "Explore",
             Self::PairProgramming => "Pair Programming",
             Self::Execute => "Execute",
         }
     }
 
     pub const fn is_tui_visible(self) -> bool {
-        matches!(self, Self::Plan | Self::Default)
+        matches!(self, Self::Plan | Self::Default | Self::Explore)
     }
 
     pub const fn allows_request_user_input(self) -> bool {
-        matches!(self, Self::Plan)
+        matches!(self, Self::Plan | Self::Explore)
     }
 }
 
@@ -793,7 +796,7 @@ mod tests {
 
     #[test]
     fn tui_visible_collaboration_modes_match_mode_kind_visibility() {
-        let expected = [ModeKind::Default, ModeKind::Plan];
+        let expected = [ModeKind::Default, ModeKind::Plan, ModeKind::Explore];
         assert_eq!(expected, TUI_VISIBLE_COLLABORATION_MODES);
 
         for mode in TUI_VISIBLE_COLLABORATION_MODES {
@@ -802,6 +805,21 @@ mod tests {
 
         assert!(!ModeKind::PairProgramming.is_tui_visible());
         assert!(!ModeKind::Execute.is_tui_visible());
+    }
+
+    #[test]
+    fn explore_mode_allows_request_user_input() {
+        assert!(ModeKind::Explore.allows_request_user_input());
+        assert!(ModeKind::Plan.allows_request_user_input());
+        assert!(!ModeKind::Default.allows_request_user_input());
+    }
+
+    #[test]
+    fn explore_mode_serializes_as_explore() {
+        let json = serde_json::to_string(&ModeKind::Explore).expect("serialize explore");
+        assert_eq!(json, "\"explore\"");
+        let mode: ModeKind = serde_json::from_str(&json).expect("deserialize explore");
+        assert_eq!(ModeKind::Explore, mode);
     }
 
     #[test]

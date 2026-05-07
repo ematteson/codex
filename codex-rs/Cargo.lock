@@ -2554,6 +2554,7 @@ dependencies = [
  "codex-model-provider-info",
  "codex-models-manager",
  "codex-network-proxy",
+ "codex-notebook",
  "codex-otel",
  "codex-plugin",
  "codex-prompts",
@@ -3393,6 +3394,14 @@ dependencies = [
  "tokio",
  "tracing",
  "url",
+]
+
+[[package]]
+name = "codex-notebook"
+version = "0.0.0"
+dependencies = [
+ "pretty_assertions",
+ "tempfile",
 ]
 
 [[package]]

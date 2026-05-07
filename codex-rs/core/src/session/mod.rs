@@ -2785,6 +2785,22 @@ impl Session {
         {
             developer_sections.push(developer_instructions.to_string());
         }
+        let memories_enabled = turn_context.features.enabled(Feature::MemoryTool)
+            && turn_context.config.memories.use_memories;
+        // Add developer instructions for the per-project notebook (Explore/Default handoff).
+        #[allow(deprecated)]
+        let notebook_cwd = turn_context.cwd.as_path();
+        let notebook_present =
+            if let Some(notebook_prompt) = build_notebook_developer_instructions(notebook_cwd) {
+                developer_sections.push(notebook_prompt);
+                true
+            } else {
+                false
+            };
+        // Cross-pollination: only when both notebook and memories are active.
+        if notebook_present && memories_enabled {
+            developer_sections.push(NOTEBOOK_MEMORIES_PROMOTION_FRAGMENT.to_string());
+        }
         // Add developer instructions from collaboration_mode if they exist and are non-empty
         if turn_context.config.include_collaboration_mode_instructions
             && let Some(collab_instructions) =
@@ -3375,6 +3391,51 @@ pub(crate) fn emit_subagent_session_started(
         subagent_source,
         created_at,
     });
+}
+
+use codex_notebook::discover_notebook_root;
+use codex_notebook::load_index;
+
+/// Cross-pollination guidance for the notebook to memories promotion flow.
+/// Only emitted when both the notebook and the memories pipeline are active,
+/// so neither side is surprised by references to the other.
+const NOTEBOOK_MEMORIES_PROMOTION_FRAGMENT: &str = "\
+# Notebook to Memories promotion
+
+When you record a Decision in the project notebook that is about how *this user* \
+works - preferences, conventions, recurring patterns - rather than this project \
+specifically, propose promoting that decision to `~/.codex/memories/MEMORY.md` \
+and ask before writing. Project-specific decisions stay in the notebook.\n";
+
+/// Reads `<repo>/.codex/notebook/INDEX.md` (if present) and renders it as a
+/// developer-instruction block. Notebook is opt-in: returns `None` when no
+/// `.codex/notebook/` exists upward from `cwd` or when the directory exists
+/// but has no INDEX.md yet. Read errors are swallowed (logged) so a malformed
+/// notebook can never block session start.
+fn build_notebook_developer_instructions(cwd: &std::path::Path) -> Option<String> {
+    let root = discover_notebook_root(cwd)?;
+    let index = match load_index(&root) {
+        Ok(Some(index)) => index,
+        Ok(None) => return None,
+        Err(err) => {
+            tracing::warn!(
+                "failed to load notebook index at {}: {err}",
+                root.index_path().display()
+            );
+            return None;
+        }
+    };
+    let mut out = String::with_capacity(index.raw.len() + 256);
+    out.push_str("# Notebook Index\n\n");
+    out.push_str(index.raw.trim_end());
+    out.push_str(
+        "\n\nThe notebook lives at `.codex/notebook/` (committed) and \
+         `.codex/scratch/` (gitignored). When this session relates to an \
+         active topic above, read the topic file before answering and \
+         maintain it as decisions accumulate. Do not restate notebook \
+         content already visible in this prompt.\n",
+    );
+    Some(out)
 }
 
 /// Builds the hook engine for one config snapshot, including any enabled plugin hooks.

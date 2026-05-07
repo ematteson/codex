@@ -5,6 +5,7 @@ use pretty_assertions::assert_eq;
 fn preset_names_use_mode_display_names() {
     assert_eq!(plan_preset().name, ModeKind::Plan.display_name());
     assert_eq!(default_preset().name, ModeKind::Default.display_name());
+    assert_eq!(explore_preset().name, ModeKind::Explore.display_name());
     assert_eq!(plan_preset().model, None);
     assert_eq!(
         plan_preset().reasoning_effort,
@@ -12,6 +13,27 @@ fn preset_names_use_mode_display_names() {
     );
     assert_eq!(default_preset().model, None);
     assert_eq!(default_preset().reasoning_effort, None);
+    assert_eq!(explore_preset().model, None);
+    assert_eq!(
+        explore_preset().reasoning_effort,
+        Some(Some(ReasoningEffort::High))
+    );
+}
+
+#[test]
+fn explore_preset_uses_explore_template() {
+    let instructions = explore_preset()
+        .developer_instructions
+        .expect("explore preset should include instructions")
+        .expect("explore instructions should be set");
+    assert!(instructions.contains("Collaboration Style: Explore"));
+    assert!(instructions.contains("`apply_patch` is forbidden in Explore mode"));
+}
+
+#[test]
+fn builtin_presets_includes_explore() {
+    let presets = builtin_collaboration_mode_presets();
+    assert!(presets.iter().any(|p| p.mode == Some(ModeKind::Explore)));
 }
 
 #[test]

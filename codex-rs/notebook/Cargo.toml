@@ -1,0 +1,19 @@
+[package]
+edition.workspace = true
+license.workspace = true
+name = "codex-notebook"
+version.workspace = true
+
+[lib]
+doctest = false
+name = "codex_notebook"
+path = "src/lib.rs"
+
+[dependencies]
+
+[dev-dependencies]
+pretty_assertions = { workspace = true }
+tempfile = { workspace = true }
+
+[lints]
+workspace = true
