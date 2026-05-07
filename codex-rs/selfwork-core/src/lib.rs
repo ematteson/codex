@@ -16,9 +16,12 @@
 //! and the eval harness.
 
 pub mod modes;
+pub mod workspace;
 
 pub use modes::Mode;
 pub use modes::ModeBundle;
+pub use workspace::SelfworkRoot;
+pub use workspace::discover_root;
 
 /// Crate-version helper used by the CLI to keep the binary `--version` line
 /// in sync with the library it links against.

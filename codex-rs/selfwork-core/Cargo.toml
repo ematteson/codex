@@ -10,6 +10,7 @@ name = "selfwork_core"
 path = "src/lib.rs"
 
 [dependencies]
+chrono = { workspace = true }
 
 [dev-dependencies]
 pretty_assertions = { workspace = true }
