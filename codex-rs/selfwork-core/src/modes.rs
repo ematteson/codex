@@ -35,6 +35,31 @@ impl Mode {
         }
     }
 
+    /// Lowercase slug used in serialized state, the CLI surface, and on-disk
+    /// directory names. Round-trips with [`Mode::from_slug`].
+    pub const fn slug(self) -> &'static str {
+        match self {
+            Mode::Explore => "explore",
+            Mode::Plan => "plan",
+            Mode::Reflect => "reflect",
+            Mode::Program => "program",
+            Mode::Review => "review",
+        }
+    }
+
+    /// Inverse of [`Mode::slug`]. Case-insensitive on input so `"Explore"`
+    /// and `"EXPLORE"` round-trip too.
+    pub fn from_slug(slug: &str) -> Option<Self> {
+        match slug.to_ascii_lowercase().as_str() {
+            "explore" => Some(Mode::Explore),
+            "plan" => Some(Mode::Plan),
+            "reflect" => Some(Mode::Reflect),
+            "program" => Some(Mode::Program),
+            "review" => Some(Mode::Review),
+            _ => None,
+        }
+    }
+
     /// Whether the bundle for this mode is implemented yet. Step 1 only ships
     /// Explore; later steps flip the rest. The CLI uses this to refuse entry
     /// to modes that have not landed.
@@ -160,6 +185,27 @@ mod tests {
         assert_eq!(Mode::Reflect.display_name(), "Reflect");
         assert_eq!(Mode::Program.display_name(), "Program");
         assert_eq!(Mode::Review.display_name(), "Review");
+    }
+
+    #[test]
+    fn slug_round_trips_with_from_slug() {
+        for mode in [
+            Mode::Explore,
+            Mode::Plan,
+            Mode::Reflect,
+            Mode::Program,
+            Mode::Review,
+        ] {
+            assert_eq!(Some(mode), Mode::from_slug(mode.slug()));
+        }
+    }
+
+    #[test]
+    fn from_slug_is_case_insensitive_and_rejects_unknown() {
+        assert_eq!(Some(Mode::Explore), Mode::from_slug("Explore"));
+        assert_eq!(Some(Mode::Program), Mode::from_slug("PROGRAM"));
+        assert_eq!(None, Mode::from_slug("introspect"));
+        assert_eq!(None, Mode::from_slug(""));
     }
 
     #[test]

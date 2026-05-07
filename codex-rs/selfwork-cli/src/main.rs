@@ -93,7 +93,7 @@ fn main() -> Result<()> {
         Command::Program => not_yet_implemented("program"),
         Command::Review => not_yet_implemented("review"),
         Command::Init => init_workspace(),
-        Command::Status => not_yet_implemented("status"),
+        Command::Status => print_status(),
         Command::Journal { target } => match target {
             JournalTarget::Today => journal_today(),
         },
@@ -141,6 +141,41 @@ fn not_yet_implemented(command: &str) -> Result<()> {
         "selfwork: `{command}` is scaffolded but not yet implemented. \
          Step 0 of the migration plan ships the CLI surface; later steps fill in behavior."
     );
+    Ok(())
+}
+
+fn print_status() -> Result<()> {
+    let root = discover_or_hint()?;
+    let active = selfwork_core::load_active_mode(&root)?;
+    let session = selfwork_core::load_session_state(&root)?;
+    let risk = selfwork_core::load_risk_flags(&root)?;
+
+    let active_label = selfwork_core::Mode::from_slug(&active.mode)
+        .map(|m| m.display_name().to_string())
+        .unwrap_or_else(|| format!("{} (unknown)", active.mode));
+    let entered = active
+        .entered_at
+        .map(|ts| ts.to_rfc3339())
+        .unwrap_or_else(|| "not yet started".to_string());
+    let session_label = match session.started_at {
+        Some(started) => format!(
+            "{} ({} turns, started {})",
+            session.session_id.as_deref().unwrap_or("active"),
+            session.turns,
+            started.to_rfc3339()
+        ),
+        None => "none".to_string(),
+    };
+    let risk_label = if risk.flags.is_empty() {
+        "none".to_string()
+    } else {
+        risk.flags.join(", ")
+    };
+
+    println!("workspace:    {}", root.root.display());
+    println!("active mode:  {active_label} (entered: {entered})");
+    println!("session:      {session_label}");
+    println!("risk flags:   {risk_label}");
     Ok(())
 }
 

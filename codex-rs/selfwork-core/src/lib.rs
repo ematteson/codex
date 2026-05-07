@@ -18,6 +18,7 @@
 pub mod bootstrap;
 pub mod journal;
 pub mod modes;
+pub mod state;
 pub mod workspace;
 
 pub use bootstrap::BootstrapReport;
@@ -26,6 +27,12 @@ pub use journal::JournalEntry;
 pub use journal::ensure_journal_entry;
 pub use modes::Mode;
 pub use modes::ModeBundle;
+pub use state::ActiveMode;
+pub use state::RiskFlags;
+pub use state::SessionState;
+pub use state::load_active_mode;
+pub use state::load_risk_flags;
+pub use state::load_session_state;
 pub use workspace::SelfworkRoot;
 pub use workspace::discover_root;
 
