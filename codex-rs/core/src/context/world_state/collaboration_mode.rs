@@ -26,6 +26,9 @@ impl CollaborationModeState {
             catalog_messages.and_then(|messages| match collaboration_mode.mode {
                 ModeKind::Default => messages.default.as_ref(),
                 ModeKind::Plan => messages.plan.as_ref(),
+                // No catalog entry for Explore — it falls back to the preset's
+                // developer instructions (the explore.md template).
+                ModeKind::Explore => None,
             });
 
         Self {

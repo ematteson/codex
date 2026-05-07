@@ -90,6 +90,7 @@ pub(crate) struct FooterProps {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum CollaborationModeIndicator {
     Plan,
+    Explore,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -144,6 +145,7 @@ impl CollaborationModeIndicator {
         };
         match self {
             CollaborationModeIndicator::Plan => format!("Plan mode{suffix}"),
+            CollaborationModeIndicator::Explore => format!("Explore mode{suffix}"),
         }
     }
 
@@ -151,6 +153,7 @@ impl CollaborationModeIndicator {
         let label = self.label(show_cycle_hint);
         match self {
             CollaborationModeIndicator::Plan => Span::from(label).magenta(),
+            CollaborationModeIndicator::Explore => Span::from(label).blue(),
         }
     }
 }
