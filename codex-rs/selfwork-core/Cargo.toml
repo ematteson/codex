@@ -11,12 +11,20 @@ path = "src/lib.rs"
 
 [dependencies]
 chrono = { workspace = true, features = ["serde"] }
+codex-app-server-client = { workspace = true }
+codex-arg0 = { workspace = true }
+codex-config = { workspace = true }
+codex-core = { workspace = true }
+codex-feedback = { workspace = true }
+codex-protocol = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
+toml = { workspace = true }
 
 [dev-dependencies]
 pretty_assertions = { workspace = true }
 tempfile = { workspace = true }
+tokio-test = { workspace = true }
 
 [lints]
 workspace = true

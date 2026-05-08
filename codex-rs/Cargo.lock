@@ -11336,10 +11336,18 @@ name = "selfwork-core"
 version = "0.0.0"
 dependencies = [
  "chrono",
+ "codex-app-server-client",
+ "codex-arg0",
+ "codex-config",
+ "codex-core",
+ "codex-feedback",
+ "codex-protocol",
  "pretty_assertions",
  "serde",
  "serde_json",
  "tempfile",
+ "tokio-test",
+ "toml 0.9.11+spec-1.1.0",
 ]
 
 [[package]]

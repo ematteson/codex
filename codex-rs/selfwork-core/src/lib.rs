@@ -18,6 +18,7 @@
 pub mod bootstrap;
 pub mod journal;
 pub mod modes;
+pub mod runtime;
 pub mod state;
 pub mod workspace;
 
@@ -27,6 +28,7 @@ pub use journal::JournalEntry;
 pub use journal::ensure_journal_entry;
 pub use modes::Mode;
 pub use modes::ModeBundle;
+pub use runtime::CodexRuntimeBuilder;
 pub use state::ActiveMode;
 pub use state::RiskFlags;
 pub use state::SessionState;

@@ -42,7 +42,7 @@ pub fn bootstrap_workspace(workspace: &Path) -> io::Result<BootstrapReport> {
         root: root.clone(),
     };
     let mut report = BootstrapReport {
-        root: root.clone(),
+        root,
         root_already_existed,
         ..Default::default()
     };
