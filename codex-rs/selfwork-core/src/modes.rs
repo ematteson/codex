@@ -189,6 +189,15 @@ mod tests {
     }
 
     #[test]
+    fn render_includes_plan_boundary_marker() {
+        let rendered = ModeBundle::for_mode(Mode::Plan)
+            .expect("Plan bundle")
+            .render_system_prompt();
+        assert!(rendered.contains(":switch explore"));
+        assert!(rendered.contains("frame change is visible"));
+    }
+
+    #[test]
     fn render_separates_invariants_from_mode_with_blank_line() {
         let rendered = ModeBundle::for_mode(Mode::Explore)
             .expect("Explore bundle")
