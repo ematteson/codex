@@ -3,9 +3,11 @@
 //! v1 surface (spec §7). Step 0: stub commands so `--help` documents the
 //! shape we are building toward; subsequent migration steps fill them in.
 
+use anyhow::Context;
 use anyhow::Result;
 use clap::Parser;
 use clap::Subcommand;
+use std::io::Write;
 
 #[derive(Debug, Parser)]
 #[command(
@@ -22,7 +24,10 @@ struct Cli {
 #[derive(Debug, Subcommand)]
 enum Command {
     /// Enter Explore mode (default).
-    Explore,
+    Explore {
+        /// Optional one-shot prompt. Omit to enter an interactive session.
+        prompt: Vec<String>,
+    },
     /// Enter Plan mode (translate insight into commitments).
     Plan,
     /// Enter Reflect mode (therapy-informed reflection).
@@ -84,10 +89,20 @@ enum ShowTarget {
 }
 
 fn main() -> Result<()> {
+    let runtime = tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()
+        .context("build tokio runtime")?;
+    runtime.block_on(async_main())
+}
+
+async fn async_main() -> Result<()> {
     let cli = Cli::parse();
-    let command = cli.command.unwrap_or(Command::Explore);
+    let command = cli
+        .command
+        .unwrap_or(Command::Explore { prompt: Vec::new() });
     match command {
-        Command::Explore => not_yet_implemented("explore"),
+        Command::Explore { prompt } => explore(prompt).await,
         Command::Plan => not_yet_implemented("plan"),
         Command::Reflect => not_yet_implemented("reflect"),
         Command::Program => not_yet_implemented("program"),
@@ -104,6 +119,59 @@ fn main() -> Result<()> {
         Command::Eval { target, .. } => not_yet_implemented(&format!("eval {target}")),
         Command::Prompt { mode } => print_prompt(&mode),
     }
+}
+
+async fn explore(prompt: Vec<String>) -> Result<()> {
+    let root = discover_or_hint()?;
+    let builder = selfwork_core::CodexRuntimeBuilder::new(selfwork_core::Mode::Explore)
+        .with_cwd(root.workspace.clone());
+    if !prompt.is_empty() {
+        let output = builder
+            .run_one_shot(prompt.join(" "))
+            .await
+            .context("run Explore one-shot")?;
+        print!("{}", output.assistant_text);
+        if !output.assistant_text.ends_with('\n') {
+            println!();
+        }
+        return Ok(());
+    }
+
+    let mut session = builder
+        .start_session()
+        .await
+        .context("start Explore session")?;
+    let mut line = String::new();
+    loop {
+        eprint!("selfwork[explore]> ");
+        std::io::stderr().flush()?;
+        line.clear();
+        let bytes = std::io::stdin().read_line(&mut line)?;
+        if bytes == 0 {
+            break;
+        }
+        let message = line.trim();
+        if message.is_empty() {
+            continue;
+        }
+        if matches!(message, ":end" | ":quit" | ":exit") {
+            break;
+        }
+        if message.starts_with(":switch") {
+            eprintln!("selfwork: :switch is scaffolded for Step 3b and will land next.");
+            continue;
+        }
+        let output = session
+            .send_user_message(message.to_string())
+            .await
+            .context("send Explore turn")?;
+        println!("{}", output.assistant_text.trim_end());
+    }
+    session
+        .shutdown()
+        .await
+        .context("shutdown Explore session")?;
+    Ok(())
 }
 
 fn print_prompt(mode_name: &str) -> Result<()> {
@@ -182,7 +250,9 @@ fn print_status() -> Result<()> {
 fn discover_or_hint() -> Result<selfwork_core::SelfworkRoot> {
     let cwd = std::env::current_dir()?;
     selfwork_core::discover_root(&cwd).ok_or_else(|| {
-        anyhow::anyhow!("no .selfwork/ workspace found upward from current directory; run `selfwork init` first")
+        anyhow::anyhow!(
+            "no .selfwork/ workspace found upward from current directory; run `selfwork init` first"
+        )
     })
 }
 
@@ -194,16 +264,19 @@ fn journal_today() -> Result<()> {
         eprintln!("selfwork: created {}", entry.path.display());
     }
     println!("{}", entry.path.display());
-    if let Ok(editor) = std::env::var("EDITOR") {
-        if !editor.is_empty() {
-            match std::process::Command::new(&editor).arg(&entry.path).status() {
-                Ok(status) if status.success() => {}
-                Ok(status) => {
-                    anyhow::bail!("$EDITOR ({editor}) exited with status {status}")
-                }
-                Err(err) => {
-                    eprintln!("selfwork: failed to launch $EDITOR ({editor}): {err}");
-                }
+    if let Ok(editor) = std::env::var("EDITOR")
+        && !editor.is_empty()
+    {
+        match std::process::Command::new(&editor)
+            .arg(&entry.path)
+            .status()
+        {
+            Ok(status) if status.success() => {}
+            Ok(status) => {
+                anyhow::bail!("$EDITOR ({editor}) exited with status {status}")
+            }
+            Err(err) => {
+                eprintln!("selfwork: failed to launch $EDITOR ({editor}): {err}");
             }
         }
     }
@@ -232,7 +305,10 @@ fn init_workspace() -> Result<()> {
         );
     }
     if !report.created_directories.is_empty() {
-        println!("  directories created: {}", report.created_directories.len());
+        println!(
+            "  directories created: {}",
+            report.created_directories.len()
+        );
     }
     if !report.created_files.is_empty() {
         println!("  files seeded:        {}", report.created_files.len());

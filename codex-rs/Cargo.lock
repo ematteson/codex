@@ -11329,6 +11329,7 @@ dependencies = [
  "chrono",
  "clap",
  "selfwork-core",
+ "tokio",
 ]
 
 [[package]]
@@ -11337,6 +11338,7 @@ version = "0.0.0"
 dependencies = [
  "chrono",
  "codex-app-server-client",
+ "codex-app-server-protocol",
  "codex-arg0",
  "codex-config",
  "codex-core",
@@ -11346,6 +11348,7 @@ dependencies = [
  "serde",
  "serde_json",
  "tempfile",
+ "tokio",
  "tokio-test",
  "toml 0.9.11+spec-1.1.0",
 ]
