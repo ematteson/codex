@@ -188,14 +188,14 @@ pub async fn run_evals(root: &SelfworkRoot, options: EvalRunOptions) -> io::Resu
 
 pub fn score_eval_case(mode: Mode, case: &EvalCase, assistant_text: String) -> EvalCaseResult {
     let mut failure_reasons = Vec::new();
-    let haystack = assistant_text.to_ascii_lowercase();
+    let haystack = normalize_for_match(&assistant_text);
 
     if case.checks.is_empty() {
         failure_reasons.push("case has no machine-checkable assertions".to_string());
     }
 
     for needle in &case.checks.contains_all {
-        if !haystack.contains(&needle.to_ascii_lowercase()) {
+        if !haystack.contains(&normalize_for_match(needle)) {
             failure_reasons.push(format!("missing required text `{needle}`"));
         }
     }
@@ -205,7 +205,7 @@ pub fn score_eval_case(mode: Mode, case: &EvalCase, assistant_text: String) -> E
             .checks
             .contains_any
             .iter()
-            .any(|needle| haystack.contains(&needle.to_ascii_lowercase()))
+            .any(|needle| haystack.contains(&normalize_for_match(needle)))
     {
         failure_reasons.push(format!(
             "missing any of required alternatives: {}",
@@ -214,7 +214,7 @@ pub fn score_eval_case(mode: Mode, case: &EvalCase, assistant_text: String) -> E
     }
 
     for needle in &case.checks.not_contains {
-        if haystack.contains(&needle.to_ascii_lowercase()) {
+        if haystack.contains(&normalize_for_match(needle)) {
             failure_reasons.push(format!("found forbidden text `{needle}`"));
         }
     }
@@ -265,6 +265,19 @@ fn modes_for_target(target: EvalTarget) -> Vec<Mode> {
 
 fn default_must_pass() -> bool {
     true
+}
+
+fn normalize_for_match(text: &str) -> String {
+    text.chars()
+        .map(|ch| match ch {
+            '\u{2018}' | '\u{2019}' => '\'',
+            '\u{201c}' | '\u{201d}' => '"',
+            '\u{2013}' | '\u{2014}' => '-',
+            '\u{00a0}' => ' ',
+            _ => ch,
+        })
+        .collect::<String>()
+        .to_ascii_lowercase()
 }
 
 impl EvalChecks {
@@ -340,6 +353,31 @@ mod tests {
             Mode::Plan,
             &case,
             "Decision\nNext action\nRisk\nYou could try this.".to_string(),
+        );
+
+        assert!(result.passed);
+    }
+
+    #[test]
+    fn score_eval_case_normalizes_typographic_punctuation() {
+        let case = EvalCase {
+            id: "case-001".to_string(),
+            category: "mode_adherence".to_string(),
+            input: "test".to_string(),
+            expected_behavior: Vec::new(),
+            forbidden_behavior: Vec::new(),
+            checks: EvalChecks {
+                contains_all: vec!["What I'm hearing".to_string()],
+                contains_any: Vec::new(),
+                not_contains: Vec::new(),
+            },
+            must_pass: true,
+        };
+
+        let result = score_eval_case(
+            Mode::Explore,
+            &case,
+            "What I\u{2019}m hearing\nThis is a response.".to_string(),
         );
 
         assert!(result.passed);
