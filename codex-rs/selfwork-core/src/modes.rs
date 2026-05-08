@@ -12,10 +12,22 @@
 
 pub(crate) const BASE_INVARIANTS: &str = include_str!("../resources/base/invariants.md");
 pub(crate) const EXPLORE_PROMPT: &str = include_str!("../resources/modes/explore/prompt.md");
+pub(crate) const PLAN_PROMPT: &str = include_str!("../resources/modes/plan/prompt.md");
 
 /// The five modes specified for selfwork v1. Plan, Reflect, Program, and
 /// Review are declared but their bundles arrive in later migration steps.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
+    schemars::JsonSchema,
+)]
+#[serde(rename_all = "snake_case")]
 pub enum Mode {
     Explore,
     Plan,
@@ -25,6 +37,14 @@ pub enum Mode {
 }
 
 impl Mode {
+    pub const ALL: [Mode; 5] = [
+        Mode::Explore,
+        Mode::Plan,
+        Mode::Reflect,
+        Mode::Program,
+        Mode::Review,
+    ];
+
     pub const fn display_name(self) -> &'static str {
         match self {
             Mode::Explore => "Explore",
@@ -64,7 +84,7 @@ impl Mode {
     /// Explore; later steps flip the rest. The CLI uses this to refuse entry
     /// to modes that have not landed.
     pub const fn is_implemented(self) -> bool {
-        matches!(self, Mode::Explore)
+        matches!(self, Mode::Explore | Mode::Plan)
     }
 }
 
@@ -81,7 +101,8 @@ impl ModeBundle {
     pub fn for_mode(mode: Mode) -> Option<Self> {
         let mode_prompt = match mode {
             Mode::Explore => EXPLORE_PROMPT,
-            Mode::Plan | Mode::Reflect | Mode::Program | Mode::Review => return None,
+            Mode::Plan => PLAN_PROMPT,
+            Mode::Reflect | Mode::Program | Mode::Review => return None,
         };
         Some(Self {
             mode,
@@ -95,7 +116,8 @@ impl ModeBundle {
     /// load-bearing — the mode prompt cannot override anything stated in the
     /// invariants because invariants are fed to the model first.
     pub fn render_system_prompt(&self) -> String {
-        let mut out = String::with_capacity(self.base_invariants.len() + self.mode_prompt.len() + 2);
+        let mut out =
+            String::with_capacity(self.base_invariants.len() + self.mode_prompt.len() + 2);
         out.push_str(self.base_invariants.trim_end());
         out.push_str("\n\n");
         out.push_str(self.mode_prompt.trim_start());
@@ -118,7 +140,6 @@ mod tests {
 
     #[test]
     fn unimplemented_modes_return_none() {
-        assert!(ModeBundle::for_mode(Mode::Plan).is_none());
         assert!(ModeBundle::for_mode(Mode::Reflect).is_none());
         assert!(ModeBundle::for_mode(Mode::Program).is_none());
         assert!(ModeBundle::for_mode(Mode::Review).is_none());
@@ -209,11 +230,19 @@ mod tests {
     }
 
     #[test]
-    fn is_implemented_only_returns_true_for_explore_in_step_one() {
+    fn is_implemented_returns_true_for_explore_and_plan() {
         assert!(Mode::Explore.is_implemented());
-        assert!(!Mode::Plan.is_implemented());
+        assert!(Mode::Plan.is_implemented());
         assert!(!Mode::Reflect.is_implemented());
         assert!(!Mode::Program.is_implemented());
         assert!(!Mode::Review.is_implemented());
+    }
+
+    #[test]
+    fn plan_bundle_is_available() {
+        let bundle = ModeBundle::for_mode(Mode::Plan).expect("Plan bundle");
+        assert_eq!(bundle.mode, Mode::Plan);
+        assert!(bundle.mode_prompt.contains("# Mode: Plan"));
+        assert!(bundle.render_system_prompt().contains("Next action"));
     }
 }

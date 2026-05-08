@@ -5,6 +5,7 @@
 
 use anyhow::Context;
 use anyhow::Result;
+use chrono::Utc;
 use clap::Parser;
 use clap::Subcommand;
 use std::io::Write;
@@ -102,8 +103,8 @@ async fn async_main() -> Result<()> {
         .command
         .unwrap_or(Command::Explore { prompt: Vec::new() });
     match command {
-        Command::Explore { prompt } => explore(prompt).await,
-        Command::Plan => not_yet_implemented("plan"),
+        Command::Explore { prompt } => run_mode(selfwork_core::Mode::Explore, prompt).await,
+        Command::Plan => run_mode(selfwork_core::Mode::Plan, Vec::new()).await,
         Command::Reflect => not_yet_implemented("reflect"),
         Command::Program => not_yet_implemented("program"),
         Command::Review => not_yet_implemented("review"),
@@ -121,15 +122,14 @@ async fn async_main() -> Result<()> {
     }
 }
 
-async fn explore(prompt: Vec<String>) -> Result<()> {
+async fn run_mode(mode: selfwork_core::Mode, prompt: Vec<String>) -> Result<()> {
     let root = discover_or_hint()?;
-    let builder = selfwork_core::CodexRuntimeBuilder::new(selfwork_core::Mode::Explore)
-        .with_cwd(root.workspace.clone());
+    let builder = selfwork_core::CodexRuntimeBuilder::new(mode).with_cwd(root.workspace.clone());
     if !prompt.is_empty() {
         let output = builder
             .run_one_shot(prompt.join(" "))
             .await
-            .context("run Explore one-shot")?;
+            .with_context(|| format!("run {} one-shot", mode.display_name()))?;
         print!("{}", output.assistant_text);
         if !output.assistant_text.ends_with('\n') {
             println!();
@@ -137,13 +137,21 @@ async fn explore(prompt: Vec<String>) -> Result<()> {
         return Ok(());
     }
 
+    interactive_mode_loop(root, builder).await
+}
+
+async fn interactive_mode_loop(
+    root: selfwork_core::SelfworkRoot,
+    builder: selfwork_core::CodexRuntimeBuilder,
+) -> Result<()> {
     let mut session = builder
         .start_session()
         .await
-        .context("start Explore session")?;
+        .context("start selfwork session")?;
+    mark_active_session(&root, &session)?;
     let mut line = String::new();
     loop {
-        eprint!("selfwork[explore]> ");
+        eprint!("selfwork[{}]> ", session.mode().slug());
         std::io::stderr().flush()?;
         line.clear();
         let bytes = std::io::stdin().read_line(&mut line)?;
@@ -158,19 +166,107 @@ async fn explore(prompt: Vec<String>) -> Result<()> {
             break;
         }
         if message.starts_with(":switch") {
-            eprintln!("selfwork: :switch is scaffolded for Step 3b and will land next.");
+            session = switch_mode(&root, session, message).await?;
             continue;
         }
         let output = session
             .send_user_message(message.to_string())
             .await
-            .context("send Explore turn")?;
+            .with_context(|| format!("send {} turn", session.mode().display_name()))?;
+        mark_active_session(&root, &session)?;
         println!("{}", output.assistant_text.trim_end());
     }
+    let _ = selfwork_core::write_explore_session_summary(&root, &session)?;
     session
         .shutdown()
         .await
-        .context("shutdown Explore session")?;
+        .context("shutdown selfwork session")?;
+    selfwork_core::save_session_state(&root, &selfwork_core::SessionState::default())?;
+    Ok(())
+}
+
+async fn switch_mode(
+    root: &selfwork_core::SelfworkRoot,
+    session: selfwork_core::SelfworkSession,
+    command: &str,
+) -> Result<selfwork_core::SelfworkSession> {
+    let target = parse_switch_target(command)?;
+    if !target.is_implemented() {
+        anyhow::bail!(
+            "mode `{}` is not implemented yet; available now: explore | plan",
+            target.slug()
+        );
+    }
+    if target == session.mode() {
+        eprintln!("selfwork: already in {} mode.", target.display_name());
+        return Ok(session);
+    }
+
+    let handoff = selfwork_core::compile_handoff(root, session.mode(), target, session.turns())
+        .context("compile mode handoff")?;
+    let migration_path =
+        selfwork_core::write_migration(root, &handoff).context("write handoff migration")?;
+    let _ = selfwork_core::write_explore_session_summary(root, &session)?;
+    session
+        .shutdown()
+        .await
+        .context("shutdown outgoing mode session")?;
+
+    let developer_instructions = selfwork_core::render_handoff_developer_instructions(&handoff)
+        .context("render incoming handoff instructions")?;
+    let incoming = selfwork_core::CodexRuntimeBuilder::new(target)
+        .with_cwd(root.workspace.clone())
+        .with_developer_instructions(developer_instructions)
+        .start_session()
+        .await
+        .with_context(|| format!("start {} session", target.display_name()))?;
+    mark_active_session(root, &incoming)?;
+    eprintln!(
+        "selfwork: switched to {} mode with handoff {}",
+        target.display_name(),
+        migration_path.display()
+    );
+    Ok(incoming)
+}
+
+fn parse_switch_target(command: &str) -> Result<selfwork_core::Mode> {
+    let mut parts = command.split_whitespace();
+    let directive = parts.next().unwrap_or_default();
+    if directive != ":switch" {
+        anyhow::bail!("expected :switch <mode>");
+    }
+    let Some(mode) = parts.next() else {
+        anyhow::bail!("usage: :switch <explore|plan|reflect|program|review>");
+    };
+    if parts.next().is_some() {
+        anyhow::bail!("usage: :switch <explore|plan|reflect|program|review>");
+    }
+    selfwork_core::Mode::from_slug(mode).ok_or_else(|| {
+        anyhow::anyhow!(
+            "unknown mode `{mode}` (expected one of: explore | plan | reflect | program | review)"
+        )
+    })
+}
+
+fn mark_active_session(
+    root: &selfwork_core::SelfworkRoot,
+    session: &selfwork_core::SelfworkSession,
+) -> Result<()> {
+    selfwork_core::save_active_mode(
+        root,
+        &selfwork_core::ActiveMode {
+            mode: session.mode().slug().to_string(),
+            entered_at: Some(Utc::now()),
+        },
+    )?;
+    selfwork_core::save_session_state(
+        root,
+        &selfwork_core::SessionState {
+            session_id: Some(session.thread_id().to_string()),
+            started_at: Some(Utc::now()),
+            turns: session.turns().len() as u64,
+        },
+    )?;
     Ok(())
 }
 
@@ -197,7 +293,7 @@ fn print_prompt(mode_name: &str) -> Result<()> {
         }
         None => {
             anyhow::bail!(
-                "mode `{}` is not yet implemented in this build (Step 1 ships Explore only)",
+                "mode `{}` is not yet implemented in this build (available now: Explore and Plan)",
                 mode.display_name()
             );
         }

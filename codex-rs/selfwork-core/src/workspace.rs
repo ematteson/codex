@@ -46,6 +46,10 @@ impl SelfworkRoot {
         self.root.join("state")
     }
 
+    pub fn migrations_dir(&self) -> PathBuf {
+        self.state_dir().join("migrations")
+    }
+
     pub fn shared_dir(&self) -> PathBuf {
         self.root.join("shared")
     }
@@ -66,11 +70,20 @@ impl SelfworkRoot {
         self.mode_dir(mode).join("prompt.md")
     }
 
+    pub fn handoff_in_schema_path(&self, mode: Mode) -> PathBuf {
+        self.mode_dir(mode).join("handoff_in.schema.json")
+    }
+
+    pub fn handoff_out_schema_path(&self, mode: Mode) -> PathBuf {
+        self.mode_dir(mode).join("handoff_out.schema.json")
+    }
+
     /// `<workspace>/.selfwork/journal/YYYY-MM-DD.md` for the supplied
     /// calendar date. Callers in production pass `chrono::Local::now().date_naive()`;
     /// tests pass a fixed date so behavior is deterministic.
     pub fn journal_path_for_date(&self, date: chrono::NaiveDate) -> PathBuf {
-        self.journal_dir().join(format!("{}.md", date.format("%Y-%m-%d")))
+        self.journal_dir()
+            .join(format!("{}.md", date.format("%Y-%m-%d")))
     }
 }
 
@@ -176,6 +189,14 @@ mod tests {
         assert_eq!(
             root.mode_prompt_path(Mode::Reflect),
             PathBuf::from("/proj/.selfwork/modes/reflect/prompt.md")
+        );
+        assert_eq!(
+            root.migrations_dir(),
+            PathBuf::from("/proj/.selfwork/state/migrations")
+        );
+        assert_eq!(
+            root.handoff_in_schema_path(Mode::Plan),
+            PathBuf::from("/proj/.selfwork/modes/plan/handoff_in.schema.json")
         );
     }
 

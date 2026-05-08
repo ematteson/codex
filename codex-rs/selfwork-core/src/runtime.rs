@@ -594,18 +594,18 @@ mod tests {
         let codex_home = TempDir::new().expect("codex home");
 
         let result = tokio_test::block_on(
-            CodexRuntimeBuilder::new(Mode::Plan)
+            CodexRuntimeBuilder::new(Mode::Reflect)
                 .with_codex_home(codex_home.path().to_path_buf())
                 .build_start_args(),
         );
         let err = match result {
-            Ok(_) => panic!("Plan is not implemented yet"),
+            Ok(_) => panic!("Reflect is not implemented yet"),
             Err(err) => err,
         };
 
         assert_eq!(err.kind(), io::ErrorKind::InvalidInput);
         assert!(
-            err.to_string().contains("Plan"),
+            err.to_string().contains("Reflect"),
             "unexpected error message: {err}"
         );
     }

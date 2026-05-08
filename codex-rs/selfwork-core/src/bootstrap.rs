@@ -10,8 +10,10 @@ use std::path::PathBuf;
 
 use crate::Mode;
 use crate::SelfworkRoot;
+use crate::handoff::handoff_schema_json;
 use crate::modes::BASE_INVARIANTS;
 use crate::modes::EXPLORE_PROMPT;
+use crate::modes::PLAN_PROMPT;
 
 /// Outcome of a `bootstrap_workspace` call. Lists what was newly created so
 /// the CLI can render a useful summary, and flags whether `.selfwork/`
@@ -61,6 +63,25 @@ pub fn bootstrap_workspace(workspace: &Path) -> io::Result<BootstrapReport> {
         EXPLORE_PROMPT.as_bytes(),
         &mut report,
     )?;
+    seed_file(
+        &resolved.mode_prompt_path(Mode::Plan),
+        PLAN_PROMPT.as_bytes(),
+        &mut report,
+    )?;
+
+    let handoff_schema = handoff_schema_json()?;
+    for mode in Mode::ALL {
+        seed_file(
+            &resolved.handoff_in_schema_path(mode),
+            &handoff_schema,
+            &mut report,
+        )?;
+        seed_file(
+            &resolved.handoff_out_schema_path(mode),
+            &handoff_schema,
+            &mut report,
+        )?;
+    }
 
     seed_file(
         &resolved.state_dir().join("active_mode.json"),
@@ -96,6 +117,7 @@ fn spec_directory_layout(root: &SelfworkRoot) -> Vec<PathBuf> {
         root.modes_dir(),
         root.skills_dir(),
         root.state_dir(),
+        root.migrations_dir(),
         root.shared_dir(),
         root.shared_dir().join("reviews"),
         root.shared_dir().join("reviews").join("weekly"),
@@ -103,7 +125,13 @@ fn spec_directory_layout(root: &SelfworkRoot) -> Vec<PathBuf> {
         root.journal_dir(),
         root.root.join("mode_private"),
     ];
-    for mode in [Mode::Explore, Mode::Plan, Mode::Reflect, Mode::Program, Mode::Review] {
+    for mode in [
+        Mode::Explore,
+        Mode::Plan,
+        Mode::Reflect,
+        Mode::Program,
+        Mode::Review,
+    ] {
         dirs.push(root.mode_dir(mode));
     }
     for skill_subdir in [
@@ -131,7 +159,10 @@ fn mode_private_subdirs() -> [(Mode, &'static [&'static str]); 5] {
         (Mode::Explore, &["sessions", "hypotheses"]),
         (Mode::Plan, &["plans"]),
         (Mode::Reflect, &["worksheets", "thought-records"]),
-        (Mode::Program, &["inventory", "sponsor-prep", "relapse-reviews"]),
+        (
+            Mode::Program,
+            &["inventory", "sponsor-prep", "relapse-reviews"],
+        ),
         (Mode::Review, &["analyses"]),
     ]
 }
@@ -222,6 +253,7 @@ mod tests {
             ".selfwork/skills/common",
             ".selfwork/skills/shared-shaped",
             ".selfwork/state",
+            ".selfwork/state/migrations",
             ".selfwork/shared/reviews/weekly",
             ".selfwork/shared/reviews/monthly",
             ".selfwork/journal",
@@ -246,12 +278,36 @@ mod tests {
         assert!(invariants.contains("# Base Invariants"));
         assert!(invariants.contains("Crisis override"));
 
-        let explore_prompt = fs::read_to_string(
-            tmp.path().join(".selfwork/modes/explore/prompt.md"),
-        )
-        .expect("read");
+        let explore_prompt =
+            fs::read_to_string(tmp.path().join(".selfwork/modes/explore/prompt.md")).expect("read");
         assert!(explore_prompt.contains("# Mode: Explore"));
         assert!(explore_prompt.contains("Socratic"));
+
+        let plan_prompt =
+            fs::read_to_string(tmp.path().join(".selfwork/modes/plan/prompt.md")).expect("read");
+        assert!(plan_prompt.contains("# Mode: Plan"));
+        assert!(plan_prompt.contains("Next action"));
+    }
+
+    #[test]
+    fn bootstrap_seeds_handoff_schemas_for_each_mode() {
+        let tmp = TempDir::new().expect("tmpdir");
+        bootstrap_workspace(tmp.path()).expect("bootstrap");
+
+        for mode in Mode::ALL {
+            for filename in ["handoff_in.schema.json", "handoff_out.schema.json"] {
+                let body = fs::read_to_string(
+                    tmp.path()
+                        .join(".selfwork/modes")
+                        .join(mode.slug())
+                        .join(filename),
+                )
+                .unwrap_or_else(|err| panic!("read {filename} for {}: {err}", mode.slug()));
+                let value: serde_json::Value = serde_json::from_str(&body)
+                    .unwrap_or_else(|err| panic!("{filename} should parse as JSON: {err}"));
+                assert_eq!(value["title"], "MigrationObject");
+            }
+        }
     }
 
     #[test]

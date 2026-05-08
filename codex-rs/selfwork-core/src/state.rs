@@ -79,6 +79,25 @@ pub fn load_risk_flags(root: &SelfworkRoot) -> io::Result<RiskFlags> {
     load_or_default(&root.state_dir().join("risk_flags.json"))
 }
 
+pub fn save_active_mode(root: &SelfworkRoot, active: &ActiveMode) -> io::Result<()> {
+    save_json(&root.state_dir().join("active_mode.json"), active)
+}
+
+pub fn save_session_state(root: &SelfworkRoot, session: &SessionState) -> io::Result<()> {
+    save_json(&root.state_dir().join("session_state.json"), session)
+}
+
+fn save_json<T>(path: &Path, value: &T) -> io::Result<()>
+where
+    T: Serialize,
+{
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    let body = serde_json::to_vec_pretty(value).map_err(|err| io::Error::other(err.to_string()))?;
+    fs::write(path, body)
+}
+
 fn load_or_default<T>(path: &Path) -> io::Result<T>
 where
     T: serde::de::DeserializeOwned + Default,
@@ -160,5 +179,21 @@ mod tests {
         std::fs::write(root.state_dir().join("active_mode.json"), "not json").expect("write");
         let err = load_active_mode(&root).expect_err("should fail");
         assert_eq!(err.kind(), io::ErrorKind::InvalidData);
+    }
+
+    #[test]
+    fn save_active_mode_writes_pretty_json() {
+        let tmp = TempDir::new().expect("tmpdir");
+        let root = fresh_workspace(&tmp);
+        let active = ActiveMode {
+            mode: "plan".to_string(),
+            entered_at: Some(Utc::now()),
+        };
+
+        save_active_mode(&root, &active).expect("save");
+        let loaded = load_active_mode(&root).expect("load");
+
+        assert_eq!(loaded.mode, "plan");
+        assert!(loaded.entered_at.is_some());
     }
 }

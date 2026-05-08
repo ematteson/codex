@@ -16,6 +16,7 @@
 //! and the eval harness.
 
 pub mod bootstrap;
+pub mod handoff;
 pub mod journal;
 pub mod modes;
 pub mod runtime;
@@ -24,6 +25,14 @@ pub mod workspace;
 
 pub use bootstrap::BootstrapReport;
 pub use bootstrap::bootstrap_workspace;
+pub use handoff::HandoffExtension;
+pub use handoff::HandoffRiskFlag;
+pub use handoff::MigrationObject;
+pub use handoff::compile_handoff;
+pub use handoff::handoff_schema_json;
+pub use handoff::render_handoff_developer_instructions;
+pub use handoff::write_explore_session_summary;
+pub use handoff::write_migration;
 pub use journal::JournalEntry;
 pub use journal::ensure_journal_entry;
 pub use modes::Mode;
@@ -39,6 +48,8 @@ pub use state::SessionState;
 pub use state::load_active_mode;
 pub use state::load_risk_flags;
 pub use state::load_session_state;
+pub use state::save_active_mode;
+pub use state::save_session_state;
 pub use workspace::SelfworkRoot;
 pub use workspace::discover_root;
 
