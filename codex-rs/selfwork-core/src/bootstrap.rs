@@ -10,6 +10,7 @@ use std::path::PathBuf;
 
 use crate::Mode;
 use crate::SelfworkRoot;
+use crate::eval::eval_matrix_yaml;
 use crate::handoff::handoff_schema_json;
 use crate::manifest::mode_manifest_yaml;
 use crate::modes::BASE_INVARIANTS;
@@ -84,6 +85,9 @@ pub fn bootstrap_workspace(workspace: &Path) -> io::Result<BootstrapReport> {
             &handoff_schema,
             &mut report,
         )?;
+        if let Some(evals) = eval_matrix_yaml(mode) {
+            seed_file(&resolved.mode_evals_path(mode), evals, &mut report)?;
+        }
     }
 
     seed_file(
@@ -331,6 +335,25 @@ mod tests {
             assert_eq!(manifest.name, mode.slug());
             assert!(!manifest.read_paths.is_empty());
         }
+    }
+
+    #[test]
+    fn bootstrap_seeds_evals_for_explore_and_plan() {
+        let tmp = TempDir::new().expect("tmpdir");
+        bootstrap_workspace(tmp.path()).expect("bootstrap");
+
+        let explore = fs::read_to_string(tmp.path().join(".selfwork/modes/explore/evals.yaml"))
+            .expect("read explore evals");
+        let plan = fs::read_to_string(tmp.path().join(".selfwork/modes/plan/evals.yaml"))
+            .expect("read plan evals");
+
+        assert!(explore.contains("explore-001"));
+        assert!(plan.contains("plan-001"));
+        assert!(
+            !tmp.path()
+                .join(".selfwork/modes/program/evals.yaml")
+                .exists()
+        );
     }
 
     #[test]

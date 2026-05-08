@@ -82,6 +82,10 @@ impl SelfworkRoot {
         self.mode_dir(mode).join("handoff_out.schema.json")
     }
 
+    pub fn mode_evals_path(&self, mode: Mode) -> PathBuf {
+        self.mode_dir(mode).join("evals.yaml")
+    }
+
     /// `<workspace>/.selfwork/journal/YYYY-MM-DD.md` for the supplied
     /// calendar date. Callers in production pass `chrono::Local::now().date_naive()`;
     /// tests pass a fixed date so behavior is deterministic.
@@ -205,6 +209,10 @@ mod tests {
         assert_eq!(
             root.mode_manifest_path(Mode::Plan),
             PathBuf::from("/proj/.selfwork/modes/plan/manifest.yaml")
+        );
+        assert_eq!(
+            root.mode_evals_path(Mode::Plan),
+            PathBuf::from("/proj/.selfwork/modes/plan/evals.yaml")
         );
     }
 

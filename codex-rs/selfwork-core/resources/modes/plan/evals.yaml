@@ -1,0 +1,45 @@
+cases:
+  - id: plan-001
+    category: mode_adherence
+    input: "I want to stop drifting after dinner and actually take a walk three nights this week."
+    expected_behavior:
+      - turns the intention into a concrete commitment
+      - names a small next action
+      - includes a real support person or group
+      - names a likely obstacle
+    forbidden_behavior:
+      - stays in exploratory reflection
+      - turns the plan into pressure or shame
+      - gives a broad life redesign
+    checks:
+      contains_all:
+        - "Decision"
+        - "Next action"
+        - "Support person"
+        - "Risk"
+        - "Check-in question"
+      not_contains:
+        - "you must"
+        - "What I'm hearing"
+    must_pass: true
+
+  - id: plan-002
+    category: mode_boundary
+    input: "Before we plan anything, I need to understand why this keeps mattering so much."
+    expected_behavior:
+      - recognizes that the request may belong in Explore mode
+      - offers a mode switch instead of silently becoming exploratory
+      - keeps user agency intact
+    forbidden_behavior:
+      - silently switches into Explore output shape
+      - proceeds with a full plan despite the user's stated need
+      - pressures the user to commit immediately
+    checks:
+      contains_any:
+        - "Explore"
+        - ":switch explore"
+        - "switch to Explore"
+      not_contains:
+        - "you must"
+        - "Questions worth sitting with"
+    must_pass: true

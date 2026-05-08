@@ -62,7 +62,7 @@ enum Command {
     /// Run mode evals.
     Eval {
         /// Mode to evaluate, or `all`.
-        target: String,
+        target: Option<String>,
         /// Run a single case by id.
         #[arg(long)]
         case: Option<String>,
@@ -117,8 +117,100 @@ async fn async_main() -> Result<()> {
             ShowTarget::Commitments => not_yet_implemented("show commitments"),
             ShowTarget::Patterns => not_yet_implemented("show patterns"),
         },
-        Command::Eval { target, .. } => not_yet_implemented(&format!("eval {target}")),
+        Command::Eval {
+            target,
+            case,
+            report,
+            new,
+        } => run_eval_command(target, case, report, new).await,
         Command::Prompt { mode } => print_prompt(&mode),
+    }
+}
+
+async fn run_eval_command(
+    target: Option<String>,
+    case: Option<String>,
+    report: bool,
+    new: Option<String>,
+) -> Result<()> {
+    if let Some(case_id) = new {
+        return not_yet_implemented(&format!("eval --new {case_id}"));
+    }
+    let root = discover_or_hint()?;
+    let target = parse_eval_target(target.as_deref())?;
+    let options = selfwork_core::EvalRunOptions {
+        target,
+        case_id: case,
+    };
+    let run_report = selfwork_core::run_evals(&root, options)
+        .await
+        .context("run selfwork evals")?;
+    print_eval_report(&run_report, report);
+    if !run_report.gate_passed() {
+        anyhow::bail!("selfwork eval gate failed");
+    }
+    Ok(())
+}
+
+fn parse_eval_target(target: Option<&str>) -> Result<selfwork_core::EvalTarget> {
+    let Some(target) = target else {
+        return Ok(selfwork_core::EvalTarget::All);
+    };
+    if target.eq_ignore_ascii_case("all") {
+        return Ok(selfwork_core::EvalTarget::All);
+    }
+    let Some(mode) = selfwork_core::Mode::from_slug(target) else {
+        anyhow::bail!(
+            "unknown eval target `{target}` (expected one of: all | explore | plan | reflect | program | review)"
+        );
+    };
+    if !mode.is_implemented() {
+        anyhow::bail!(
+            "mode `{}` is not implemented yet; available eval targets now: all | explore | plan",
+            mode.slug()
+        );
+    }
+    Ok(selfwork_core::EvalTarget::Mode(mode))
+}
+
+fn print_eval_report(report: &selfwork_core::EvalRunReport, detailed: bool) {
+    println!("Running {} evals...", report.results.len());
+    for result in &report.results {
+        let status = if result.passed { "PASS" } else { "FAIL" };
+        let reason = result
+            .failure_reasons
+            .first()
+            .map(|reason| format!(" - {reason}"))
+            .unwrap_or_default();
+        println!(
+            "{:<11} {:<14} {:<24} {}{}",
+            result.mode.slug(),
+            result.id,
+            result.category,
+            status,
+            reason
+        );
+        if detailed && !result.passed {
+            for reason in &result.failure_reasons {
+                println!("  failure: {reason}");
+            }
+            println!("  assistant:");
+            for line in result.assistant_text.lines() {
+                println!("    {line}");
+            }
+        }
+    }
+    for summary in report.summaries() {
+        let gate = if summary.gate_passed { "PASS" } else { "FAIL" };
+        println!(
+            "Summary {}: {}/{} passed ({:.0}%, required {:.0}%) gate {}",
+            summary.mode.slug(),
+            summary.passed,
+            summary.total,
+            summary.pass_rate * 100.0,
+            summary.required_pass_rate * 100.0,
+            gate
+        );
     }
 }
 

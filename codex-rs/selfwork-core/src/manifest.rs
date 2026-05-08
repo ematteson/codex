@@ -19,7 +19,7 @@ use serde::Serialize;
 use crate::Mode;
 use crate::SelfworkRoot;
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ModeManifest {
     pub name: String,
     pub display_name: String,
@@ -28,6 +28,14 @@ pub struct ModeManifest {
     pub read_paths: Vec<String>,
     #[serde(default)]
     pub write_paths: Vec<String>,
+    #[serde(default = "default_eval_config")]
+    pub evals: ModeEvalConfig,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct ModeEvalConfig {
+    pub matrix: String,
+    pub required_pass_rate: f64,
 }
 
 impl ModeManifest {
@@ -85,7 +93,18 @@ impl ModeManifest {
             version: "1.0.0".to_string(),
             read_paths: read_paths.into_iter().map(str::to_string).collect(),
             write_paths: write_paths.into_iter().map(str::to_string).collect(),
+            evals: ModeEvalConfig {
+                matrix: "./evals.yaml".to_string(),
+                required_pass_rate: crate::required_pass_rate(mode),
+            },
         }
+    }
+}
+
+fn default_eval_config() -> ModeEvalConfig {
+    ModeEvalConfig {
+        matrix: "./evals.yaml".to_string(),
+        required_pass_rate: 1.0,
     }
 }
 
@@ -247,6 +266,8 @@ mod tests {
                 .write_paths
                 .contains(&"../../shared/commitments.md".to_string())
         );
+        assert_eq!(manifest.evals.matrix, "./evals.yaml");
+        assert_eq!(manifest.evals.required_pass_rate, 0.90);
     }
 
     #[test]

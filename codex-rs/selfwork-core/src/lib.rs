@@ -16,6 +16,7 @@
 //! and the eval harness.
 
 pub mod bootstrap;
+pub mod eval;
 pub mod handoff;
 pub mod journal;
 pub mod manifest;
@@ -26,6 +27,20 @@ pub mod workspace;
 
 pub use bootstrap::BootstrapReport;
 pub use bootstrap::bootstrap_workspace;
+pub use eval::EvalCase;
+pub use eval::EvalCaseResult;
+pub use eval::EvalChecks;
+pub use eval::EvalMatrix;
+pub use eval::EvalModeSummary;
+pub use eval::EvalRunOptions;
+pub use eval::EvalRunReport;
+pub use eval::EvalTarget;
+pub use eval::embedded_eval_matrix;
+pub use eval::eval_matrix_yaml;
+pub use eval::load_eval_matrix;
+pub use eval::required_pass_rate;
+pub use eval::run_evals;
+pub use eval::score_eval_case;
 pub use handoff::HandoffExtension;
 pub use handoff::HandoffRiskFlag;
 pub use handoff::MigrationObject;
