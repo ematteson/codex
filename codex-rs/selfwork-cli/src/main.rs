@@ -124,7 +124,9 @@ async fn async_main() -> Result<()> {
 
 async fn run_mode(mode: selfwork_core::Mode, prompt: Vec<String>) -> Result<()> {
     let root = discover_or_hint()?;
-    let builder = selfwork_core::CodexRuntimeBuilder::new(mode).with_cwd(root.workspace.clone());
+    let builder = selfwork_core::CodexRuntimeBuilder::new(mode)
+        .with_cwd(root.workspace.clone())
+        .with_selfwork_root(root.clone());
     if !prompt.is_empty() {
         let output = builder
             .run_one_shot(prompt.join(" "))
@@ -216,6 +218,7 @@ async fn switch_mode(
         .context("render incoming handoff instructions")?;
     let incoming = selfwork_core::CodexRuntimeBuilder::new(target)
         .with_cwd(root.workspace.clone())
+        .with_selfwork_root(root.clone())
         .with_developer_instructions(developer_instructions)
         .start_session()
         .await

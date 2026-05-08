@@ -70,6 +70,10 @@ impl SelfworkRoot {
         self.mode_dir(mode).join("prompt.md")
     }
 
+    pub fn mode_manifest_path(&self, mode: Mode) -> PathBuf {
+        self.mode_dir(mode).join("manifest.yaml")
+    }
+
     pub fn handoff_in_schema_path(&self, mode: Mode) -> PathBuf {
         self.mode_dir(mode).join("handoff_in.schema.json")
     }
@@ -197,6 +201,10 @@ mod tests {
         assert_eq!(
             root.handoff_in_schema_path(Mode::Plan),
             PathBuf::from("/proj/.selfwork/modes/plan/handoff_in.schema.json")
+        );
+        assert_eq!(
+            root.mode_manifest_path(Mode::Plan),
+            PathBuf::from("/proj/.selfwork/modes/plan/manifest.yaml")
         );
     }
 

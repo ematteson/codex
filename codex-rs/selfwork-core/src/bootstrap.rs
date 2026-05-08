@@ -11,6 +11,7 @@ use std::path::PathBuf;
 use crate::Mode;
 use crate::SelfworkRoot;
 use crate::handoff::handoff_schema_json;
+use crate::manifest::mode_manifest_yaml;
 use crate::modes::BASE_INVARIANTS;
 use crate::modes::EXPLORE_PROMPT;
 use crate::modes::PLAN_PROMPT;
@@ -71,6 +72,8 @@ pub fn bootstrap_workspace(workspace: &Path) -> io::Result<BootstrapReport> {
 
     let handoff_schema = handoff_schema_json()?;
     for mode in Mode::ALL {
+        let manifest = mode_manifest_yaml(mode)?;
+        seed_file(&resolved.mode_manifest_path(mode), &manifest, &mut report)?;
         seed_file(
             &resolved.handoff_in_schema_path(mode),
             &handoff_schema,
@@ -307,6 +310,26 @@ mod tests {
                     .unwrap_or_else(|err| panic!("{filename} should parse as JSON: {err}"));
                 assert_eq!(value["title"], "MigrationObject");
             }
+        }
+    }
+
+    #[test]
+    fn bootstrap_seeds_manifests_for_each_mode() {
+        let tmp = TempDir::new().expect("tmpdir");
+        bootstrap_workspace(tmp.path()).expect("bootstrap");
+
+        for mode in Mode::ALL {
+            let body = fs::read_to_string(
+                tmp.path()
+                    .join(".selfwork/modes")
+                    .join(mode.slug())
+                    .join("manifest.yaml"),
+            )
+            .unwrap_or_else(|err| panic!("read manifest for {}: {err}", mode.slug()));
+            let manifest: crate::ModeManifest = serde_yaml::from_str(&body)
+                .unwrap_or_else(|err| panic!("manifest should parse as YAML: {err}"));
+            assert_eq!(manifest.name, mode.slug());
+            assert!(!manifest.read_paths.is_empty());
         }
     }
 

@@ -41,6 +41,8 @@ use toml::Value as TomlValue;
 
 use crate::Mode;
 use crate::ModeBundle;
+use crate::SelfworkRoot;
+use crate::permission_profile_for_mode;
 
 const SELFWORK_CLIENT_NAME: &str = "selfwork";
 const SELFWORK_SESSION_SOURCE: &str = "selfwork";
@@ -89,6 +91,7 @@ pub struct CodexRuntimeBuilder {
     client_version: String,
     channel_capacity: usize,
     developer_instructions: Option<String>,
+    selfwork_root: Option<SelfworkRoot>,
 }
 
 impl CodexRuntimeBuilder {
@@ -104,6 +107,7 @@ impl CodexRuntimeBuilder {
             client_version: env!("CARGO_PKG_VERSION").to_string(),
             channel_capacity: DEFAULT_IN_PROCESS_CHANNEL_CAPACITY,
             developer_instructions: None,
+            selfwork_root: None,
         }
     }
 
@@ -124,6 +128,11 @@ impl CodexRuntimeBuilder {
 
     pub fn with_cwd(mut self, cwd: PathBuf) -> Self {
         self.cwd = Some(cwd);
+        self
+    }
+
+    pub fn with_selfwork_root(mut self, root: SelfworkRoot) -> Self {
+        self.selfwork_root = Some(root);
         self
     }
 
@@ -182,9 +191,16 @@ impl CodexRuntimeBuilder {
         let mut cli_overrides = self.cli_overrides;
         force_memories_off(&mut cli_overrides);
 
+        let permission_profile = self
+            .selfwork_root
+            .as_ref()
+            .map(|root| permission_profile_for_mode(root, self.mode))
+            .transpose()?;
+
         let harness_overrides = ConfigOverrides {
             cwd: self.cwd,
             approval_policy: Some(AskForApproval::Never),
+            permission_profile,
             base_instructions: Some(mode_bundle.render_system_prompt()),
             developer_instructions: self.developer_instructions,
             ..Default::default()
@@ -608,5 +624,34 @@ mod tests {
             err.to_string().contains("Reflect"),
             "unexpected error message: {err}"
         );
+    }
+
+    #[test]
+    fn build_start_args_applies_selfwork_acl() {
+        let tmp = TempDir::new().expect("tmpdir");
+        crate::bootstrap_workspace(tmp.path()).expect("bootstrap");
+        let root = SelfworkRoot {
+            workspace: tmp.path().to_path_buf(),
+            root: tmp.path().join(".selfwork"),
+        };
+        let codex_home = TempDir::new().expect("codex home");
+
+        let start_args = tokio_test::block_on(
+            CodexRuntimeBuilder::new(Mode::Explore)
+                .with_arg0_paths(test_arg0_paths())
+                .with_codex_home(codex_home.path().to_path_buf())
+                .with_cwd(root.workspace.clone())
+                .with_selfwork_root(root.clone())
+                .build_start_args(),
+        )
+        .expect("start args");
+
+        let policy = start_args
+            .config
+            .permissions
+            .permission_profile()
+            .file_system_sandbox_policy();
+        assert!(policy.can_write_path_with_cwd(&root.journal_dir(), &root.workspace));
+        assert!(!policy.can_write_path_with_cwd(&root.shared_dir(), &root.workspace));
     }
 }
