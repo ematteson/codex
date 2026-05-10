@@ -16,6 +16,7 @@ use crate::manifest::mode_manifest_yaml;
 use crate::modes::BASE_INVARIANTS;
 use crate::modes::EXPLORE_PROMPT;
 use crate::modes::PLAN_PROMPT;
+use crate::modes::REFLECT_PROMPT;
 
 /// Outcome of a `bootstrap_workspace` call. Lists what was newly created so
 /// the CLI can render a useful summary, and flags whether `.selfwork/`
@@ -68,6 +69,11 @@ pub fn bootstrap_workspace(workspace: &Path) -> io::Result<BootstrapReport> {
     seed_file(
         &resolved.mode_prompt_path(Mode::Plan),
         PLAN_PROMPT.as_bytes(),
+        &mut report,
+    )?;
+    seed_file(
+        &resolved.mode_prompt_path(Mode::Reflect),
+        REFLECT_PROMPT.as_bytes(),
         &mut report,
     )?;
 
@@ -294,6 +300,11 @@ mod tests {
             fs::read_to_string(tmp.path().join(".selfwork/modes/plan/prompt.md")).expect("read");
         assert!(plan_prompt.contains("# Mode: Plan"));
         assert!(plan_prompt.contains("Next action"));
+
+        let reflect_prompt =
+            fs::read_to_string(tmp.path().join(".selfwork/modes/reflect/prompt.md")).expect("read");
+        assert!(reflect_prompt.contains("# Mode: Reflect"));
+        assert!(reflect_prompt.contains("Regulate"));
     }
 
     #[test]

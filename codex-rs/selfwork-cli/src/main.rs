@@ -105,7 +105,7 @@ async fn async_main() -> Result<()> {
     match command {
         Command::Explore { prompt } => run_mode(selfwork_core::Mode::Explore, prompt).await,
         Command::Plan => run_mode(selfwork_core::Mode::Plan, Vec::new()).await,
-        Command::Reflect => not_yet_implemented("reflect"),
+        Command::Reflect => run_mode(selfwork_core::Mode::Reflect, Vec::new()).await,
         Command::Program => not_yet_implemented("program"),
         Command::Review => not_yet_implemented("review"),
         Command::Init => init_workspace(),
@@ -166,7 +166,7 @@ fn parse_eval_target(target: Option<&str>) -> Result<selfwork_core::EvalTarget> 
     };
     if !mode.is_implemented() {
         anyhow::bail!(
-            "mode `{}` is not implemented yet; available eval targets now: all | explore | plan",
+            "mode `{}` is not implemented yet; available eval targets now: all | explore | plan | reflect",
             mode.slug()
         );
     }
@@ -287,7 +287,7 @@ async fn switch_mode(
     let target = parse_switch_target(command)?;
     if !target.is_implemented() {
         anyhow::bail!(
-            "mode `{}` is not implemented yet; available now: explore | plan",
+            "mode `{}` is not implemented yet; available now: explore | plan | reflect",
             target.slug()
         );
     }
@@ -388,7 +388,7 @@ fn print_prompt(mode_name: &str) -> Result<()> {
         }
         None => {
             anyhow::bail!(
-                "mode `{}` is not yet implemented in this build (available now: Explore and Plan)",
+                "mode `{}` is not yet implemented in this build (available now: Explore, Plan, and Reflect)",
                 mode.display_name()
             );
         }

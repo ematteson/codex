@@ -13,9 +13,10 @@
 pub(crate) const BASE_INVARIANTS: &str = include_str!("../resources/base/invariants.md");
 pub(crate) const EXPLORE_PROMPT: &str = include_str!("../resources/modes/explore/prompt.md");
 pub(crate) const PLAN_PROMPT: &str = include_str!("../resources/modes/plan/prompt.md");
+pub(crate) const REFLECT_PROMPT: &str = include_str!("../resources/modes/reflect/prompt.md");
 
-/// The five modes specified for selfwork v1. Plan, Reflect, Program, and
-/// Review are declared but their bundles arrive in later migration steps.
+/// The five modes specified for selfwork v1. Program and Review are declared
+/// but their bundles arrive in later migration steps.
 #[derive(
     Debug,
     Clone,
@@ -84,7 +85,7 @@ impl Mode {
     /// Explore; later steps flip the rest. The CLI uses this to refuse entry
     /// to modes that have not landed.
     pub const fn is_implemented(self) -> bool {
-        matches!(self, Mode::Explore | Mode::Plan)
+        matches!(self, Mode::Explore | Mode::Plan | Mode::Reflect)
     }
 }
 
@@ -102,7 +103,8 @@ impl ModeBundle {
         let mode_prompt = match mode {
             Mode::Explore => EXPLORE_PROMPT,
             Mode::Plan => PLAN_PROMPT,
-            Mode::Reflect | Mode::Program | Mode::Review => return None,
+            Mode::Reflect => REFLECT_PROMPT,
+            Mode::Program | Mode::Review => return None,
         };
         Some(Self {
             mode,
@@ -140,7 +142,6 @@ mod tests {
 
     #[test]
     fn unimplemented_modes_return_none() {
-        assert!(ModeBundle::for_mode(Mode::Reflect).is_none());
         assert!(ModeBundle::for_mode(Mode::Program).is_none());
         assert!(ModeBundle::for_mode(Mode::Review).is_none());
     }
@@ -198,6 +199,20 @@ mod tests {
     }
 
     #[test]
+    fn render_includes_reflect_posture_and_boundary_markers() {
+        let rendered = ModeBundle::for_mode(Mode::Reflect)
+            .expect("Reflect bundle")
+            .render_system_prompt();
+        assert!(rendered.contains("# Mode: Reflect"));
+        assert!(rendered.contains("Regulate"));
+        assert!(rendered.contains("Name the pattern"));
+        assert!(rendered.contains("Reframe"));
+        assert!(rendered.contains("Next healthy action"));
+        assert!(rendered.contains(":switch plan"));
+        assert!(rendered.contains("Do not diagnose"));
+    }
+
+    #[test]
     fn render_separates_invariants_from_mode_with_blank_line() {
         let rendered = ModeBundle::for_mode(Mode::Explore)
             .expect("Explore bundle")
@@ -239,10 +254,10 @@ mod tests {
     }
 
     #[test]
-    fn is_implemented_returns_true_for_explore_and_plan() {
+    fn is_implemented_returns_true_for_explore_plan_and_reflect() {
         assert!(Mode::Explore.is_implemented());
         assert!(Mode::Plan.is_implemented());
-        assert!(!Mode::Reflect.is_implemented());
+        assert!(Mode::Reflect.is_implemented());
         assert!(!Mode::Program.is_implemented());
         assert!(!Mode::Review.is_implemented());
     }
@@ -253,5 +268,17 @@ mod tests {
         assert_eq!(bundle.mode, Mode::Plan);
         assert!(bundle.mode_prompt.contains("# Mode: Plan"));
         assert!(bundle.render_system_prompt().contains("Next action"));
+    }
+
+    #[test]
+    fn reflect_bundle_is_available() {
+        let bundle = ModeBundle::for_mode(Mode::Reflect).expect("Reflect bundle");
+        assert_eq!(bundle.mode, Mode::Reflect);
+        assert!(bundle.mode_prompt.contains("# Mode: Reflect"));
+        assert!(
+            bundle
+                .render_system_prompt()
+                .contains("No professional impersonation")
+        );
     }
 }
