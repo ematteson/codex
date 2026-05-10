@@ -306,9 +306,9 @@ mod tests {
             .expect("parse")
             .expect("reflect matrix");
 
-        assert_eq!(explore.cases.len(), 2);
-        assert_eq!(plan.cases.len(), 2);
-        assert_eq!(reflect.cases.len(), 4);
+        assert_eq!(explore.cases.len(), 3);
+        assert_eq!(plan.cases.len(), 4);
+        assert_eq!(reflect.cases.len(), 5);
         assert_eq!(explore.cases[0].id, "explore-001");
         assert_eq!(plan.cases[0].id, "plan-001");
         assert_eq!(reflect.cases[0].id, "reflect-001");
