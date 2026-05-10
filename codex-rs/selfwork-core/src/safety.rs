@@ -153,7 +153,7 @@ pub fn render_guidance(flags: &[SafetyFlag]) -> String {
     }
     if flags.contains(&SafetyFlag::Dependency) {
         guidance.push_str(
-            "- Dependency/exclusivity signal detected: do not deepen the private dyad; acknowledge the feeling briefly and route toward human support and real-world practice.\n",
+            "- Dependency/exclusivity signal detected: suspend the ordinary mode output shape for this turn; do not use planning, reflection, or exploration section headings. Do not deepen the private dyad. Acknowledge the feeling briefly and route toward human support and real-world practice before offering any further selfwork.\n",
         );
     }
     if flags.contains(&SafetyFlag::Relapse) {
@@ -228,6 +228,13 @@ mod tests {
         );
 
         assert_eq!(assessment.flags, vec![SafetyFlag::Dependency]);
+        assert!(
+            assessment
+                .guidance
+                .as_deref()
+                .unwrap_or_default()
+                .contains("suspend the ordinary mode output shape")
+        );
     }
 
     #[test]
