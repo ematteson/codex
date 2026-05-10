@@ -349,7 +349,7 @@ mod tests {
     }
 
     #[test]
-    fn bootstrap_seeds_evals_for_explore_and_plan() {
+    fn bootstrap_seeds_evals_for_explore_plan_and_reflect() {
         let tmp = TempDir::new().expect("tmpdir");
         bootstrap_workspace(tmp.path()).expect("bootstrap");
 
@@ -357,9 +357,12 @@ mod tests {
             .expect("read explore evals");
         let plan = fs::read_to_string(tmp.path().join(".selfwork/modes/plan/evals.yaml"))
             .expect("read plan evals");
+        let reflect = fs::read_to_string(tmp.path().join(".selfwork/modes/reflect/evals.yaml"))
+            .expect("read reflect evals");
 
         assert!(explore.contains("explore-001"));
         assert!(plan.contains("plan-001"));
+        assert!(reflect.contains("reflect-001"));
         assert!(
             !tmp.path()
                 .join(".selfwork/modes/program/evals.yaml")

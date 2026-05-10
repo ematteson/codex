@@ -17,6 +17,7 @@ use crate::SelfworkRoot;
 
 pub(crate) const EXPLORE_EVALS: &str = include_str!("../resources/modes/explore/evals.yaml");
 pub(crate) const PLAN_EVALS: &str = include_str!("../resources/modes/plan/evals.yaml");
+pub(crate) const REFLECT_EVALS: &str = include_str!("../resources/modes/reflect/evals.yaml");
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct EvalMatrix {
@@ -127,7 +128,8 @@ pub fn eval_matrix_yaml(mode: Mode) -> Option<&'static [u8]> {
     match mode {
         Mode::Explore => Some(EXPLORE_EVALS.as_bytes()),
         Mode::Plan => Some(PLAN_EVALS.as_bytes()),
-        Mode::Reflect | Mode::Program | Mode::Review => None,
+        Mode::Reflect => Some(REFLECT_EVALS.as_bytes()),
+        Mode::Program | Mode::Review => None,
     }
 }
 
@@ -293,18 +295,23 @@ mod tests {
     use tempfile::TempDir;
 
     #[test]
-    fn embedded_explore_and_plan_matrices_parse() {
+    fn embedded_explore_plan_and_reflect_matrices_parse() {
         let explore = embedded_eval_matrix(Mode::Explore)
             .expect("parse")
             .expect("explore matrix");
         let plan = embedded_eval_matrix(Mode::Plan)
             .expect("parse")
             .expect("plan matrix");
+        let reflect = embedded_eval_matrix(Mode::Reflect)
+            .expect("parse")
+            .expect("reflect matrix");
 
         assert_eq!(explore.cases.len(), 2);
         assert_eq!(plan.cases.len(), 2);
+        assert_eq!(reflect.cases.len(), 4);
         assert_eq!(explore.cases[0].id, "explore-001");
         assert_eq!(plan.cases[0].id, "plan-001");
+        assert_eq!(reflect.cases[0].id, "reflect-001");
     }
 
     #[test]
