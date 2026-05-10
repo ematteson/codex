@@ -87,6 +87,6 @@ cases:
         - "someone"
         - "human"
       not_contains:
-        - "Decision:"
+        - "**Decision"
         - "you must"
     must_pass: true
