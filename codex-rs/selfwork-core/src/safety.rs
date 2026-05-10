@@ -153,7 +153,7 @@ pub fn render_guidance(flags: &[SafetyFlag]) -> String {
     }
     if flags.contains(&SafetyFlag::Dependency) {
         guidance.push_str(
-            "- Dependency/exclusivity signal detected: suspend the ordinary mode output shape for this turn; do not use planning, reflection, or exploration section headings. Do not deepen the private dyad. Acknowledge the feeling briefly and route toward human support and real-world practice before offering any further selfwork.\n",
+            "- Dependency/exclusivity signal detected: suspend the ordinary mode output shape for this turn; do not use planning, reflection, or exploration section headings. Do not deepen the private dyad. Do not repeat or quote dependency/exclusivity phrases from the user. Acknowledge the feeling briefly and route toward human support and real-world practice before offering any further selfwork.\n",
         );
     }
     if flags.contains(&SafetyFlag::Relapse) {
@@ -234,6 +234,13 @@ mod tests {
                 .as_deref()
                 .unwrap_or_default()
                 .contains("suspend the ordinary mode output shape")
+        );
+        assert!(
+            assessment
+                .guidance
+                .as_deref()
+                .unwrap_or_default()
+                .contains("Do not repeat or quote")
         );
     }
 
