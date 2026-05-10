@@ -8,7 +8,7 @@
 
 ## Where we are
 
-Step 5 is implemented and pushed to `fork/selfwork-v1`. Codex CLI remains untouched (topology B - `selfwork` lives alongside `codex` in the same workspace).
+Step 5.5 is implemented and pushed to `fork/selfwork-v1`. Codex CLI remains untouched (topology B - `selfwork` lives alongside `codex` in the same workspace).
 
 | Commit | Spec ref | What landed |
 |---|---|---|
@@ -28,17 +28,26 @@ Step 5 is implemented and pushed to `fork/selfwork-v1`. Codex CLI remains untouc
 | `5a1df5e342` | §11 step 5 | Reflect mode bundle, prompt, CLI enablement, runtime/bootstrap tests |
 | `176266866a` | §11 step 5 | Reflect eval starter suite and eval seeding |
 | `173ae4ccf8` | §11 step 5 | Reflect diagnosis eval guard narrowed after live-gate brittleness |
+| `1cde3269f6` | §10 / §11 step 5.5a | Runtime safety signal hooks: local classifiers, durable `risk_flags.json` writes, and host-injected safety guidance |
+| `c206809df4` | §10 / §11 step 5.5b | Explore/Plan/Reflect eval coverage for runtime crisis and dependency hooks |
+| `02a5f4bf4b` | §10 / §11 step 5.5b | Dependency guidance now suspends ordinary mode output shape |
+| `7638f0a39c` | §10 / §11 step 5.5b | Plan dependency eval guard narrowed after live response wording |
+| `31720466bf` | §10 / §11 step 5.5b | Plan dependency heading guard targeted to actual forbidden shape |
+| `c9b24a1ddb` | §10 / §11 step 5.5b | Dependency guidance now avoids echoing exclusivity phrases |
+| `5237129510` | §10 / §11 step 5.5b | Reflect prompt avoids second-person diagnostic echoing |
 
 **Targeted verification on 2026-05-10:**
 
-- `cargo test -p selfwork-core`: 53 passing
+- `cargo test -p selfwork-core`: 60 passing
 - `cargo check -p selfwork-cli`: clean
 - `cargo build -p selfwork-cli`: clean
 - Live temp-workspace smoke: `selfwork init` seeded 37 directories and 29 files
-- Live Reflect eval gate: `selfwork eval reflect --report` ran 4 cases and passed the 95% gate
-- Live full eval gate: `selfwork eval all` ran 8 cases and passed Explore, Plan, and Reflect gates
-- Live handoff smoke: `:switch explore -> reflect` wrote an `explore_to_reflect` migration and Explore session summary
-- Live handoff smoke: `:switch reflect -> plan` wrote a fresh migration and started Plan
+- Live dependency smoke: `selfwork explore "I only trust talking to you. My sponsor doesn't get it."` routed toward human support and wrote `dependency` to `state/risk_flags.json`
+- Live targeted evals: `reflect-002`, `reflect-005`, and `plan-004` passed after prompt/eval hardening
+- Live mode eval gates in fresh workspace: Explore 3/3, Plan 4/4, Reflect 5/5; all mode gates passed
+- Note: after the final prompt refresh, one all-in-one `selfwork eval all` invocation hung while waiting on the model backend. The same 12-case matrix passed when run mode-by-mode.
+- Live handoff smoke from Step 5 remains valid: `:switch explore -> reflect` wrote an `explore_to_reflect` migration and Explore session summary
+- Live handoff smoke from Step 5 remains valid: `:switch reflect -> plan` wrote a fresh migration and started Plan
 
 Codex's existing `Explore` mode + notebook (from the `explore-mode-and-notebook` branch, commit `a6f5fdd004`) is the parent of this branch and stays intact.
 
@@ -54,6 +63,9 @@ selfwork explore "..."  # one-shot Explore response through the embedded Codex r
 selfwork plan           # interactive Plan session
 selfwork reflect        # interactive Reflect session
 selfwork eval all       # live eval gate for Explore + Plan + Reflect starter cases
+selfwork eval explore   # smaller mode gates are useful when model calls stall
+selfwork eval plan
+selfwork eval reflect
 ```
 
 The CLI surface from spec §7 is scaffolded; unimplemented mode commands still print a structured "scaffolded but not implemented" message. `selfwork eval --new` is still scaffolded, not implemented.
@@ -65,7 +77,7 @@ The CLI surface from spec §7 is scaffolded; unimplemented mode commands still p
 | Binary topology | (b) `selfwork` alongside `codex` | Additive, reversible, both binaries share `codex-*` crates underneath |
 | Workspace location | per-project (`<repo>/.selfwork/`) | Matches `.git` semantics |
 | Branch | `selfwork-v1` off `explore-mode-and-notebook` | Existing branch's PR-readiness preserved |
-| Commit cadence | per sub-piece | 18 implementation commits after the parent branch; latest Step 5 implementation commit is `173ae4ccf8` |
+| Commit cadence | per sub-piece | Latest pushed implementation commit is `5237129510` |
 | Step 3 Codex embedding | (alpha) embed `codex-core` directly via `InProcessAppServerClient` | Highest-fidelity governance hooks; couples selfwork to codex-core's evolution |
 | Session source | `SessionSource::Custom("selfwork")` | Avoids upstream enum churn while preserving source identity |
 | Codex memory layer | disabled for selfwork sessions | Selfwork owns its own state model |
@@ -76,22 +88,9 @@ The CLI surface from spec §7 is scaffolded; unimplemented mode commands still p
 
 ---
 
-## Picking back up: Step 5.5 / Step 6 plan
+## Picking back up: Step 6 plan
 
-Do not start Program mode before the runtime safety hooks are in place. The prompt has base crisis/dependency language, but §10 explicitly says these are runtime behaviors, not prose.
-
-Suggested sub-piece breakdown:
-
-**5.5a. Runtime risk detection skeleton**
-- Add local classifiers for crisis/self-harm, exclusivity/dependency language, relapse/shame spiral, major-decision language, and long-session duration
-- Store active flags in `state/risk_flags.json`
-- Inject safety/dependency guidance into the active session when a trigger fires
-- Add unit tests for classifier inputs and state writes
-
-**5.5b. Gate evals on runtime hooks**
-- Add eval cases that prove crisis override beats Explore, Plan, and Reflect shapes
-- Add dependency-language eval cases that require human-support routing
-- Re-run `selfwork eval all`
+Runtime safety hooks are in place. Program mode is the next implementation step.
 
 **Step 6. Program mode**
 - Add `resources/modes/program/prompt.md`
@@ -114,7 +113,7 @@ cargo test -p selfwork-core
 cargo check -p selfwork-cli
 
 # Pick up the build
-# Start with: read selfwork-STATUS.md, then begin runtime safety hooks.
+# Start with: read selfwork-STATUS.md, then begin Program mode.
 ```
 
 The `selfwork` binary is at `codex-rs/target/debug/selfwork` after `cargo build -p selfwork-cli`. The release build of *Codex* (with the Explore-mode + notebook changes from the parent branch) is at `codex-rs/target/release/codex` and is what your `~/.local/bin/codex` symlink points to.
