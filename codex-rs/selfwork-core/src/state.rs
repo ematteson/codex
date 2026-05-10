@@ -87,6 +87,10 @@ pub fn save_session_state(root: &SelfworkRoot, session: &SessionState) -> io::Re
     save_json(&root.state_dir().join("session_state.json"), session)
 }
 
+pub fn save_risk_flags(root: &SelfworkRoot, risk: &RiskFlags) -> io::Result<()> {
+    save_json(&root.state_dir().join("risk_flags.json"), risk)
+}
+
 fn save_json<T>(path: &Path, value: &T) -> io::Result<()>
 where
     T: Serialize,
@@ -195,5 +199,19 @@ mod tests {
 
         assert_eq!(loaded.mode, "plan");
         assert!(loaded.entered_at.is_some());
+    }
+
+    #[test]
+    fn save_risk_flags_writes_pretty_json() {
+        let tmp = TempDir::new().expect("tmpdir");
+        let root = fresh_workspace(&tmp);
+        let risk = RiskFlags {
+            flags: vec!["crisis".to_string(), "dependency".to_string()],
+        };
+
+        save_risk_flags(&root, &risk).expect("save");
+        let loaded = load_risk_flags(&root).expect("load");
+
+        assert_eq!(loaded, risk);
     }
 }

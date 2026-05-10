@@ -9,6 +9,8 @@ use std::io;
 use std::path::PathBuf;
 use std::sync::Arc;
 
+use chrono::DateTime;
+use chrono::Utc;
 use codex_app_server_client::DEFAULT_IN_PROCESS_CHANNEL_CAPACITY;
 use codex_app_server_client::EnvironmentManager;
 use codex_app_server_client::EnvironmentManagerArgs;
@@ -41,8 +43,13 @@ use toml::Value as TomlValue;
 
 use crate::Mode;
 use crate::ModeBundle;
+use crate::RiskFlags;
+use crate::SafetyContext;
 use crate::SelfworkRoot;
+use crate::assess_user_message;
+use crate::load_risk_flags;
 use crate::permission_profile_for_mode;
+use crate::save_risk_flags;
 
 const SELFWORK_CLIENT_NAME: &str = "selfwork";
 const SELFWORK_SESSION_SOURCE: &str = "selfwork";
@@ -259,15 +266,18 @@ pub struct SelfworkSession {
     client: InProcessAppServerClient,
     request_ids: RequestIdSequencer,
     thread_id: String,
+    started_at: DateTime<Utc>,
     cwd: PathBuf,
     approval_policy: codex_app_server_protocol::AskForApproval,
     reasoning_effort: Option<ReasoningEffort>,
+    selfwork_root: Option<SelfworkRoot>,
     turns: Vec<SelfworkTurn>,
 }
 
 impl SelfworkSession {
     pub async fn start(builder: CodexRuntimeBuilder) -> io::Result<Self> {
         let mode = builder.mode;
+        let selfwork_root = builder.selfwork_root.clone();
         let start_args = builder.build_start_args().await?;
         let config = Arc::clone(&start_args.config);
         let cwd = config.cwd.to_path_buf();
@@ -302,9 +312,11 @@ impl SelfworkSession {
             client,
             request_ids,
             thread_id: response.thread.id,
+            started_at: Utc::now(),
             cwd,
             approval_policy,
             reasoning_effort,
+            selfwork_root,
             turns: Vec::new(),
         })
     }
@@ -317,6 +329,10 @@ impl SelfworkSession {
         &self.thread_id
     }
 
+    pub fn started_at(&self) -> DateTime<Utc> {
+        self.started_at
+    }
+
     pub fn turns(&self) -> &[SelfworkTurn] {
         &self.turns
     }
@@ -326,6 +342,29 @@ impl SelfworkSession {
         user_message: impl Into<String>,
     ) -> io::Result<OneShotOutput> {
         let user_message = user_message.into();
+        let assessment = assess_user_message(
+            &user_message,
+            &SafetyContext {
+                session_started_at: self.started_at,
+                now: Utc::now(),
+            },
+        );
+        if let Some(root) = &self.selfwork_root
+            && !assessment.is_empty()
+        {
+            persist_safety_flags(
+                root,
+                &assessment
+                    .flags
+                    .iter()
+                    .map(|flag| flag.slug())
+                    .collect::<Vec<_>>(),
+            )?;
+        }
+        let runtime_augmented_message = match assessment.guidance {
+            Some(guidance) => format!("{guidance}\n[User message]\n{user_message}"),
+            None => user_message.clone(),
+        };
         let response: TurnStartResponse = send_request_with_response(
             &self.client,
             ClientRequest::TurnStart {
@@ -333,7 +372,7 @@ impl SelfworkSession {
                 params: TurnStartParams {
                     thread_id: self.thread_id.clone(),
                     input: vec![UserInput::Text {
-                        text: user_message.clone(),
+                        text: runtime_augmented_message,
                         text_elements: Vec::new(),
                     }],
                     responsesapi_client_metadata: None,
@@ -396,6 +435,18 @@ impl SelfworkSession {
             }
         }
     }
+}
+
+fn persist_safety_flags(root: &SelfworkRoot, new_flags: &[&str]) -> io::Result<()> {
+    let mut risk = load_risk_flags(root)?;
+    for flag in new_flags {
+        let flag = (*flag).to_string();
+        if !risk.flags.contains(&flag) {
+            risk.flags.push(flag);
+        }
+    }
+    risk.flags.sort();
+    save_risk_flags(root, &RiskFlags { flags: risk.flags })
 }
 
 #[derive(Default)]
@@ -653,5 +704,34 @@ mod tests {
             .file_system_sandbox_policy();
         assert!(policy.can_write_path_with_cwd(&root.journal_dir(), &root.workspace));
         assert!(!policy.can_write_path_with_cwd(&root.shared_dir(), &root.workspace));
+    }
+
+    #[test]
+    fn persist_safety_flags_merges_and_sorts_existing_flags() {
+        let tmp = TempDir::new().expect("tmpdir");
+        crate::bootstrap_workspace(tmp.path()).expect("bootstrap");
+        let root = SelfworkRoot {
+            workspace: tmp.path().to_path_buf(),
+            root: tmp.path().join(".selfwork"),
+        };
+        crate::save_risk_flags(
+            &root,
+            &RiskFlags {
+                flags: vec!["relapse".to_string()],
+            },
+        )
+        .expect("seed risk");
+
+        persist_safety_flags(&root, &["crisis", "relapse", "dependency"]).expect("persist");
+
+        let risk = crate::load_risk_flags(&root).expect("risk");
+        assert_eq!(
+            risk.flags,
+            vec![
+                "crisis".to_string(),
+                "dependency".to_string(),
+                "relapse".to_string()
+            ]
+        );
     }
 }
