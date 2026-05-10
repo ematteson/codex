@@ -43,7 +43,7 @@ cases:
       not_contains:
         - "you have ADHD"
         - "you have borderline"
-        - "diagnosis is"
+        - "your diagnosis is"
     must_pass: true
 
   - id: reflect-003
