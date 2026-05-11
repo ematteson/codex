@@ -320,12 +320,44 @@ mod tests {
             &root.shared_dir().join("sponsor_questions.md"),
             &root.workspace
         ));
-        assert!(!policy.can_write_path_with_cwd(
-            &root.shared_dir().join("commitments.md"),
-            &root.workspace
-        ));
+        assert!(
+            !policy.can_write_path_with_cwd(
+                &root.shared_dir().join("commitments.md"),
+                &root.workspace
+            )
+        );
         assert!(
             policy.can_write_path_with_cwd(&root.mode_private_dir(Mode::Program), &root.workspace)
+        );
+    }
+
+    #[test]
+    fn review_permission_profile_reads_all_mode_private_and_writes_reviews_only() {
+        let (_tmp, root) = bootstrapped_root();
+
+        let profile = permission_profile_for_mode(&root, Mode::Review).expect("profile");
+        let policy = profile.file_system_sandbox_policy();
+
+        assert!(
+            policy.can_read_path_with_cwd(&root.mode_private_dir(Mode::Explore), &root.workspace)
+        );
+        assert!(
+            policy.can_read_path_with_cwd(&root.mode_private_dir(Mode::Program), &root.workspace)
+        );
+        assert!(
+            policy.can_write_path_with_cwd(&root.mode_private_dir(Mode::Review), &root.workspace)
+        );
+        assert!(
+            policy.can_write_path_with_cwd(&root.shared_dir().join("reviews"), &root.workspace)
+        );
+        assert!(
+            !policy.can_write_path_with_cwd(&root.mode_private_dir(Mode::Program), &root.workspace)
+        );
+        assert!(
+            !policy.can_write_path_with_cwd(
+                &root.shared_dir().join("commitments.md"),
+                &root.workspace
+            )
         );
     }
 }

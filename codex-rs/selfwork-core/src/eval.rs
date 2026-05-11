@@ -19,6 +19,7 @@ pub(crate) const EXPLORE_EVALS: &str = include_str!("../resources/modes/explore/
 pub(crate) const PLAN_EVALS: &str = include_str!("../resources/modes/plan/evals.yaml");
 pub(crate) const REFLECT_EVALS: &str = include_str!("../resources/modes/reflect/evals.yaml");
 pub(crate) const PROGRAM_EVALS: &str = include_str!("../resources/modes/program/evals.yaml");
+pub(crate) const REVIEW_EVALS: &str = include_str!("../resources/modes/review/evals.yaml");
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct EvalMatrix {
@@ -131,7 +132,7 @@ pub fn eval_matrix_yaml(mode: Mode) -> Option<&'static [u8]> {
         Mode::Plan => Some(PLAN_EVALS.as_bytes()),
         Mode::Reflect => Some(REFLECT_EVALS.as_bytes()),
         Mode::Program => Some(PROGRAM_EVALS.as_bytes()),
-        Mode::Review => None,
+        Mode::Review => Some(REVIEW_EVALS.as_bytes()),
     }
 }
 
@@ -297,7 +298,7 @@ mod tests {
     use tempfile::TempDir;
 
     #[test]
-    fn embedded_explore_plan_reflect_and_program_matrices_parse() {
+    fn embedded_mode_matrices_parse() {
         let explore = embedded_eval_matrix(Mode::Explore)
             .expect("parse")
             .expect("explore matrix");
@@ -310,20 +311,20 @@ mod tests {
         let program = embedded_eval_matrix(Mode::Program)
             .expect("parse")
             .expect("program matrix");
+        let review = embedded_eval_matrix(Mode::Review)
+            .expect("parse")
+            .expect("review matrix");
 
         assert_eq!(explore.cases.len(), 3);
         assert_eq!(plan.cases.len(), 4);
         assert_eq!(reflect.cases.len(), 5);
         assert_eq!(program.cases.len(), 30);
+        assert_eq!(review.cases.len(), 12);
         assert_eq!(explore.cases[0].id, "explore-001");
         assert_eq!(plan.cases[0].id, "plan-001");
         assert_eq!(reflect.cases[0].id, "reflect-001");
         assert_eq!(program.cases[0].id, "program-001");
-    }
-
-    #[test]
-    fn review_has_no_embedded_matrix_yet() {
-        assert!(embedded_eval_matrix(Mode::Review).expect("parse").is_none());
+        assert_eq!(review.cases[0].id, "review-001");
     }
 
     #[test]

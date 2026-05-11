@@ -657,24 +657,23 @@ mod tests {
     }
 
     #[test]
-    fn build_start_args_rejects_modes_without_bundles() {
+    fn build_start_args_supports_review_bundle_before_cli_enablement() {
         let codex_home = TempDir::new().expect("codex home");
 
-        let result = tokio_test::block_on(
+        let start_args = tokio_test::block_on(
             CodexRuntimeBuilder::new(Mode::Review)
                 .with_codex_home(codex_home.path().to_path_buf())
                 .build_start_args(),
-        );
-        let err = match result {
-            Ok(_) => panic!("Review has no runtime bundle yet"),
-            Err(err) => err,
-        };
+        )
+        .expect("start args");
 
-        assert_eq!(err.kind(), io::ErrorKind::InvalidInput);
-        assert!(
-            err.to_string().contains("Review"),
-            "unexpected error message: {err}"
-        );
+        let base_instructions = start_args
+            .config
+            .base_instructions
+            .as_deref()
+            .expect("selfwork base instructions");
+        assert!(base_instructions.contains("# Mode: Review"));
+        assert!(base_instructions.contains("What recurred"));
     }
 
     #[test]

@@ -15,9 +15,9 @@ pub(crate) const EXPLORE_PROMPT: &str = include_str!("../resources/modes/explore
 pub(crate) const PLAN_PROMPT: &str = include_str!("../resources/modes/plan/prompt.md");
 pub(crate) const REFLECT_PROMPT: &str = include_str!("../resources/modes/reflect/prompt.md");
 pub(crate) const PROGRAM_PROMPT: &str = include_str!("../resources/modes/program/prompt.md");
+pub(crate) const REVIEW_PROMPT: &str = include_str!("../resources/modes/review/prompt.md");
 
-/// The five modes specified for selfwork v1. Review is declared but its
-/// bundle arrives in a later migration step.
+/// The five modes specified for selfwork v1.
 #[derive(
     Debug,
     Clone,
@@ -107,7 +107,7 @@ impl ModeBundle {
             Mode::Plan => PLAN_PROMPT,
             Mode::Reflect => REFLECT_PROMPT,
             Mode::Program => PROGRAM_PROMPT,
-            Mode::Review => return None,
+            Mode::Review => REVIEW_PROMPT,
         };
         Some(Self {
             mode,
@@ -144,8 +144,8 @@ mod tests {
     }
 
     #[test]
-    fn unimplemented_modes_return_none() {
-        assert!(ModeBundle::for_mode(Mode::Review).is_none());
+    fn all_v1_mode_bundles_are_available() {
+        assert!(ModeBundle::for_mode(Mode::Review).is_some());
     }
 
     #[test]
@@ -289,6 +289,19 @@ mod tests {
         let bundle = ModeBundle::for_mode(Mode::Program).expect("Program bundle");
         assert_eq!(bundle.mode, Mode::Program);
         assert!(bundle.mode_prompt.contains("# Mode: Program"));
-        assert!(bundle.render_system_prompt().contains("What to ask your sponsor"));
+        assert!(
+            bundle
+                .render_system_prompt()
+                .contains("What to ask your sponsor")
+        );
+    }
+
+    #[test]
+    fn review_bundle_is_available_but_not_cli_enabled_yet() {
+        let bundle = ModeBundle::for_mode(Mode::Review).expect("Review bundle");
+        assert_eq!(bundle.mode, Mode::Review);
+        assert!(bundle.mode_prompt.contains("# Mode: Review"));
+        assert!(bundle.render_system_prompt().contains("What recurred"));
+        assert!(!Mode::Review.is_implemented());
     }
 }

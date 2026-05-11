@@ -18,6 +18,7 @@ use crate::modes::EXPLORE_PROMPT;
 use crate::modes::PLAN_PROMPT;
 use crate::modes::PROGRAM_PROMPT;
 use crate::modes::REFLECT_PROMPT;
+use crate::modes::REVIEW_PROMPT;
 
 /// Outcome of a `bootstrap_workspace` call. Lists what was newly created so
 /// the CLI can render a useful summary, and flags whether `.selfwork/`
@@ -80,6 +81,11 @@ pub fn bootstrap_workspace(workspace: &Path) -> io::Result<BootstrapReport> {
     seed_file(
         &resolved.mode_prompt_path(Mode::Program),
         PROGRAM_PROMPT.as_bytes(),
+        &mut report,
+    )?;
+    seed_file(
+        &resolved.mode_prompt_path(Mode::Review),
+        REVIEW_PROMPT.as_bytes(),
         &mut report,
     )?;
 
@@ -159,6 +165,7 @@ fn spec_directory_layout(root: &SelfworkRoot) -> Vec<PathBuf> {
         "plan",
         "reflect",
         "program",
+        "review",
         "shared-shaped",
     ] {
         dirs.push(root.skills_dir().join(skill_subdir));
@@ -316,6 +323,11 @@ mod tests {
             fs::read_to_string(tmp.path().join(".selfwork/modes/program/prompt.md")).expect("read");
         assert!(program_prompt.contains("# Mode: Program"));
         assert!(program_prompt.contains("What to ask your sponsor"));
+
+        let review_prompt =
+            fs::read_to_string(tmp.path().join(".selfwork/modes/review/prompt.md")).expect("read");
+        assert!(review_prompt.contains("# Mode: Review"));
+        assert!(review_prompt.contains("What recurred"));
     }
 
     #[test]
@@ -360,7 +372,7 @@ mod tests {
     }
 
     #[test]
-    fn bootstrap_seeds_evals_for_explore_plan_reflect_and_program() {
+    fn bootstrap_seeds_evals_for_all_modes() {
         let tmp = TempDir::new().expect("tmpdir");
         bootstrap_workspace(tmp.path()).expect("bootstrap");
 
@@ -372,11 +384,14 @@ mod tests {
             .expect("read reflect evals");
         let program = fs::read_to_string(tmp.path().join(".selfwork/modes/program/evals.yaml"))
             .expect("read program evals");
+        let review = fs::read_to_string(tmp.path().join(".selfwork/modes/review/evals.yaml"))
+            .expect("read review evals");
 
         assert!(explore.contains("explore-001"));
         assert!(plan.contains("plan-001"));
         assert!(reflect.contains("reflect-001"));
         assert!(program.contains("program-001"));
+        assert!(review.contains("review-001"));
     }
 
     #[test]
