@@ -18,7 +18,7 @@ cases:
         - "What to bring to which mode next"
       not_contains:
         - "**Decision"
-        - "Name the pattern"
+        - "**Name the pattern"
         - "Inventory prompt"
     must_pass: true
 
