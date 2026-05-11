@@ -82,11 +82,12 @@ impl Mode {
         }
     }
 
-    /// Whether the mode is enabled for interactive CLI use. Program has a
-    /// runtime bundle before this flips because Step 6 gates enablement on a
-    /// 100% eval pass.
+    /// Whether the mode is enabled for interactive CLI use.
     pub const fn is_implemented(self) -> bool {
-        matches!(self, Mode::Explore | Mode::Plan | Mode::Reflect)
+        matches!(
+            self,
+            Mode::Explore | Mode::Plan | Mode::Reflect | Mode::Program
+        )
     }
 }
 
@@ -255,11 +256,11 @@ mod tests {
     }
 
     #[test]
-    fn is_implemented_returns_true_for_explore_plan_and_reflect() {
+    fn is_implemented_returns_true_for_explore_plan_reflect_and_program() {
         assert!(Mode::Explore.is_implemented());
         assert!(Mode::Plan.is_implemented());
         assert!(Mode::Reflect.is_implemented());
-        assert!(!Mode::Program.is_implemented());
+        assert!(Mode::Program.is_implemented());
         assert!(!Mode::Review.is_implemented());
     }
 
@@ -284,11 +285,10 @@ mod tests {
     }
 
     #[test]
-    fn program_bundle_is_available_but_not_cli_enabled_yet() {
+    fn program_bundle_is_available() {
         let bundle = ModeBundle::for_mode(Mode::Program).expect("Program bundle");
         assert_eq!(bundle.mode, Mode::Program);
         assert!(bundle.mode_prompt.contains("# Mode: Program"));
         assert!(bundle.render_system_prompt().contains("What to ask your sponsor"));
-        assert!(!Mode::Program.is_implemented());
     }
 }
