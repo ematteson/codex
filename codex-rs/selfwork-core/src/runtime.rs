@@ -657,7 +657,7 @@ mod tests {
     }
 
     #[test]
-    fn build_start_args_supports_review_bundle_before_cli_enablement() {
+    fn build_start_args_supports_review_bundle() {
         let codex_home = TempDir::new().expect("codex home");
 
         let start_args = tokio_test::block_on(

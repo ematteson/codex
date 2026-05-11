@@ -86,7 +86,7 @@ impl Mode {
     pub const fn is_implemented(self) -> bool {
         matches!(
             self,
-            Mode::Explore | Mode::Plan | Mode::Reflect | Mode::Program
+            Mode::Explore | Mode::Plan | Mode::Reflect | Mode::Program | Mode::Review
         )
     }
 }
@@ -256,12 +256,12 @@ mod tests {
     }
 
     #[test]
-    fn is_implemented_returns_true_for_explore_plan_reflect_and_program() {
+    fn is_implemented_returns_true_for_all_v1_modes() {
         assert!(Mode::Explore.is_implemented());
         assert!(Mode::Plan.is_implemented());
         assert!(Mode::Reflect.is_implemented());
         assert!(Mode::Program.is_implemented());
-        assert!(!Mode::Review.is_implemented());
+        assert!(Mode::Review.is_implemented());
     }
 
     #[test]
@@ -297,11 +297,10 @@ mod tests {
     }
 
     #[test]
-    fn review_bundle_is_available_but_not_cli_enabled_yet() {
+    fn review_bundle_is_available() {
         let bundle = ModeBundle::for_mode(Mode::Review).expect("Review bundle");
         assert_eq!(bundle.mode, Mode::Review);
         assert!(bundle.mode_prompt.contains("# Mode: Review"));
         assert!(bundle.render_system_prompt().contains("What recurred"));
-        assert!(!Mode::Review.is_implemented());
     }
 }
