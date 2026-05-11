@@ -308,4 +308,24 @@ mod tests {
             !policy.can_write_path_with_cwd(&root.shared_dir().join("values.md"), &root.workspace)
         );
     }
+
+    #[test]
+    fn program_permission_profile_allows_only_sponsor_questions_in_shared() {
+        let (_tmp, root) = bootstrapped_root();
+
+        let profile = permission_profile_for_mode(&root, Mode::Program).expect("profile");
+        let policy = profile.file_system_sandbox_policy();
+
+        assert!(policy.can_write_path_with_cwd(
+            &root.shared_dir().join("sponsor_questions.md"),
+            &root.workspace
+        ));
+        assert!(!policy.can_write_path_with_cwd(
+            &root.shared_dir().join("commitments.md"),
+            &root.workspace
+        ));
+        assert!(
+            policy.can_write_path_with_cwd(&root.mode_private_dir(Mode::Program), &root.workspace)
+        );
+    }
 }

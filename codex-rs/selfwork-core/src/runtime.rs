@@ -657,22 +657,22 @@ mod tests {
     }
 
     #[test]
-    fn build_start_args_rejects_unimplemented_modes() {
+    fn build_start_args_rejects_modes_without_bundles() {
         let codex_home = TempDir::new().expect("codex home");
 
         let result = tokio_test::block_on(
-            CodexRuntimeBuilder::new(Mode::Program)
+            CodexRuntimeBuilder::new(Mode::Review)
                 .with_codex_home(codex_home.path().to_path_buf())
                 .build_start_args(),
         );
         let err = match result {
-            Ok(_) => panic!("Program is not implemented yet"),
+            Ok(_) => panic!("Review has no runtime bundle yet"),
             Err(err) => err,
         };
 
         assert_eq!(err.kind(), io::ErrorKind::InvalidInput);
         assert!(
-            err.to_string().contains("Program"),
+            err.to_string().contains("Review"),
             "unexpected error message: {err}"
         );
     }

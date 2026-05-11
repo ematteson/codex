@@ -16,6 +16,7 @@ use crate::manifest::mode_manifest_yaml;
 use crate::modes::BASE_INVARIANTS;
 use crate::modes::EXPLORE_PROMPT;
 use crate::modes::PLAN_PROMPT;
+use crate::modes::PROGRAM_PROMPT;
 use crate::modes::REFLECT_PROMPT;
 
 /// Outcome of a `bootstrap_workspace` call. Lists what was newly created so
@@ -74,6 +75,11 @@ pub fn bootstrap_workspace(workspace: &Path) -> io::Result<BootstrapReport> {
     seed_file(
         &resolved.mode_prompt_path(Mode::Reflect),
         REFLECT_PROMPT.as_bytes(),
+        &mut report,
+    )?;
+    seed_file(
+        &resolved.mode_prompt_path(Mode::Program),
+        PROGRAM_PROMPT.as_bytes(),
         &mut report,
     )?;
 
@@ -305,6 +311,11 @@ mod tests {
             fs::read_to_string(tmp.path().join(".selfwork/modes/reflect/prompt.md")).expect("read");
         assert!(reflect_prompt.contains("# Mode: Reflect"));
         assert!(reflect_prompt.contains("Regulate"));
+
+        let program_prompt =
+            fs::read_to_string(tmp.path().join(".selfwork/modes/program/prompt.md")).expect("read");
+        assert!(program_prompt.contains("# Mode: Program"));
+        assert!(program_prompt.contains("What to ask your sponsor"));
     }
 
     #[test]
@@ -349,7 +360,7 @@ mod tests {
     }
 
     #[test]
-    fn bootstrap_seeds_evals_for_explore_plan_and_reflect() {
+    fn bootstrap_seeds_evals_for_explore_plan_reflect_and_program() {
         let tmp = TempDir::new().expect("tmpdir");
         bootstrap_workspace(tmp.path()).expect("bootstrap");
 
@@ -359,15 +370,13 @@ mod tests {
             .expect("read plan evals");
         let reflect = fs::read_to_string(tmp.path().join(".selfwork/modes/reflect/evals.yaml"))
             .expect("read reflect evals");
+        let program = fs::read_to_string(tmp.path().join(".selfwork/modes/program/evals.yaml"))
+            .expect("read program evals");
 
         assert!(explore.contains("explore-001"));
         assert!(plan.contains("plan-001"));
         assert!(reflect.contains("reflect-001"));
-        assert!(
-            !tmp.path()
-                .join(".selfwork/modes/program/evals.yaml")
-                .exists()
-        );
+        assert!(program.contains("program-001"));
     }
 
     #[test]

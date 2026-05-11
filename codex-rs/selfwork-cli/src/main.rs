@@ -164,9 +164,9 @@ fn parse_eval_target(target: Option<&str>) -> Result<selfwork_core::EvalTarget> 
             "unknown eval target `{target}` (expected one of: all | explore | plan | reflect | program | review)"
         );
     };
-    if !mode.is_implemented() {
+    if selfwork_core::eval_matrix_yaml(mode).is_none() {
         anyhow::bail!(
-            "mode `{}` is not implemented yet; available eval targets now: all | explore | plan | reflect",
+            "mode `{}` has no eval matrix yet; available eval targets now: all | explore | plan | reflect | program",
             mode.slug()
         );
     }

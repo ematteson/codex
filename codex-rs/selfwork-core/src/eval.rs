@@ -18,6 +18,7 @@ use crate::SelfworkRoot;
 pub(crate) const EXPLORE_EVALS: &str = include_str!("../resources/modes/explore/evals.yaml");
 pub(crate) const PLAN_EVALS: &str = include_str!("../resources/modes/plan/evals.yaml");
 pub(crate) const REFLECT_EVALS: &str = include_str!("../resources/modes/reflect/evals.yaml");
+pub(crate) const PROGRAM_EVALS: &str = include_str!("../resources/modes/program/evals.yaml");
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct EvalMatrix {
@@ -129,7 +130,8 @@ pub fn eval_matrix_yaml(mode: Mode) -> Option<&'static [u8]> {
         Mode::Explore => Some(EXPLORE_EVALS.as_bytes()),
         Mode::Plan => Some(PLAN_EVALS.as_bytes()),
         Mode::Reflect => Some(REFLECT_EVALS.as_bytes()),
-        Mode::Program | Mode::Review => None,
+        Mode::Program => Some(PROGRAM_EVALS.as_bytes()),
+        Mode::Review => None,
     }
 }
 
@@ -259,7 +261,7 @@ fn modes_for_target(target: EvalTarget) -> Vec<Mode> {
     match target {
         EvalTarget::All => Mode::ALL
             .into_iter()
-            .filter(|mode| mode.is_implemented())
+            .filter(|mode| eval_matrix_yaml(*mode).is_some())
             .collect(),
         EvalTarget::Mode(mode) => vec![mode],
     }
@@ -295,7 +297,7 @@ mod tests {
     use tempfile::TempDir;
 
     #[test]
-    fn embedded_explore_plan_and_reflect_matrices_parse() {
+    fn embedded_explore_plan_reflect_and_program_matrices_parse() {
         let explore = embedded_eval_matrix(Mode::Explore)
             .expect("parse")
             .expect("explore matrix");
@@ -305,22 +307,23 @@ mod tests {
         let reflect = embedded_eval_matrix(Mode::Reflect)
             .expect("parse")
             .expect("reflect matrix");
+        let program = embedded_eval_matrix(Mode::Program)
+            .expect("parse")
+            .expect("program matrix");
 
         assert_eq!(explore.cases.len(), 3);
         assert_eq!(plan.cases.len(), 4);
         assert_eq!(reflect.cases.len(), 5);
+        assert_eq!(program.cases.len(), 30);
         assert_eq!(explore.cases[0].id, "explore-001");
         assert_eq!(plan.cases[0].id, "plan-001");
         assert_eq!(reflect.cases[0].id, "reflect-001");
+        assert_eq!(program.cases[0].id, "program-001");
     }
 
     #[test]
-    fn unimplemented_modes_have_no_embedded_matrix_yet() {
-        assert!(
-            embedded_eval_matrix(Mode::Program)
-                .expect("parse")
-                .is_none()
-        );
+    fn review_has_no_embedded_matrix_yet() {
+        assert!(embedded_eval_matrix(Mode::Review).expect("parse").is_none());
     }
 
     #[test]

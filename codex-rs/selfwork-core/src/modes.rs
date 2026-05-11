@@ -14,9 +14,10 @@ pub(crate) const BASE_INVARIANTS: &str = include_str!("../resources/base/invaria
 pub(crate) const EXPLORE_PROMPT: &str = include_str!("../resources/modes/explore/prompt.md");
 pub(crate) const PLAN_PROMPT: &str = include_str!("../resources/modes/plan/prompt.md");
 pub(crate) const REFLECT_PROMPT: &str = include_str!("../resources/modes/reflect/prompt.md");
+pub(crate) const PROGRAM_PROMPT: &str = include_str!("../resources/modes/program/prompt.md");
 
-/// The five modes specified for selfwork v1. Program and Review are declared
-/// but their bundles arrive in later migration steps.
+/// The five modes specified for selfwork v1. Review is declared but its
+/// bundle arrives in a later migration step.
 #[derive(
     Debug,
     Clone,
@@ -81,9 +82,9 @@ impl Mode {
         }
     }
 
-    /// Whether the bundle for this mode is implemented yet. Step 1 only ships
-    /// Explore; later steps flip the rest. The CLI uses this to refuse entry
-    /// to modes that have not landed.
+    /// Whether the mode is enabled for interactive CLI use. Program has a
+    /// runtime bundle before this flips because Step 6 gates enablement on a
+    /// 100% eval pass.
     pub const fn is_implemented(self) -> bool {
         matches!(self, Mode::Explore | Mode::Plan | Mode::Reflect)
     }
@@ -97,14 +98,15 @@ pub struct ModeBundle {
 }
 
 impl ModeBundle {
-    /// Returns the bundle for `mode` if implemented, or `None` if the bundle
-    /// has not landed yet (the CLI should refuse entry in that case).
+    /// Returns the bundle for `mode` if its prompt has landed, or `None` if
+    /// the bundle is still absent.
     pub fn for_mode(mode: Mode) -> Option<Self> {
         let mode_prompt = match mode {
             Mode::Explore => EXPLORE_PROMPT,
             Mode::Plan => PLAN_PROMPT,
             Mode::Reflect => REFLECT_PROMPT,
-            Mode::Program | Mode::Review => return None,
+            Mode::Program => PROGRAM_PROMPT,
+            Mode::Review => return None,
         };
         Some(Self {
             mode,
@@ -142,7 +144,6 @@ mod tests {
 
     #[test]
     fn unimplemented_modes_return_none() {
-        assert!(ModeBundle::for_mode(Mode::Program).is_none());
         assert!(ModeBundle::for_mode(Mode::Review).is_none());
     }
 
@@ -280,5 +281,14 @@ mod tests {
                 .render_system_prompt()
                 .contains("No professional impersonation")
         );
+    }
+
+    #[test]
+    fn program_bundle_is_available_but_not_cli_enabled_yet() {
+        let bundle = ModeBundle::for_mode(Mode::Program).expect("Program bundle");
+        assert_eq!(bundle.mode, Mode::Program);
+        assert!(bundle.mode_prompt.contains("# Mode: Program"));
+        assert!(bundle.render_system_prompt().contains("What to ask your sponsor"));
+        assert!(!Mode::Program.is_implemented());
     }
 }
