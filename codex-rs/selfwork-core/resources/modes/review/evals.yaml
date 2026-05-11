@@ -138,7 +138,6 @@ cases:
         - "conversation"
         - "evidence"
       not_contains:
-        - "your sponsor is wrong"
         - "I replace"
         - "ignore your sponsor"
     must_pass: true

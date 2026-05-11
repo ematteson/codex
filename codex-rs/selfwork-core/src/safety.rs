@@ -85,8 +85,11 @@ pub fn assess_user_message(input: &str, context: &SafetyContext) -> SafetyAssess
             "only trust talking to you",
             "you're all i have",
             "you are all i have",
+            "only thing keeping me going",
             "don't need anyone else",
             "do not need anyone else",
+            "don't want to involve anyone else",
+            "do not want to involve anyone else",
             "my sponsor doesn't get it",
             "my therapist doesn't get it",
         ],
@@ -223,7 +226,7 @@ mod tests {
     #[test]
     fn detects_dependency_language() {
         let assessment = assess_user_message(
-            "I only trust talking to you. My sponsor doesn't get it.",
+            "These reviews are the only thing keeping me going. I don't want to involve anyone else.",
             &context(),
         );
 
