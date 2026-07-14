@@ -33,47 +33,67 @@ jobs:
           ref: codex-explore-mainline
           fetch-depth: 0
 
-      - name: Find newest stable upstream tag
+      - name: Pick build target (newest stable tag, or branch HEAD)
         id: tag
         run: |
           git remote add upstream https://github.com/openai/codex.git
           # Read tags from the remote directly — local tag state after
           # actions/checkout is unreliable, and this avoids fetching 2000+ tags.
+          # Strict semver only: excludes -alpha/-beta/-rc AND the legacy
+          # date-encoded rust-v.0.0.* tags that sort -V ranks absurdly high.
           ALL=$(git ls-remote --tags --refs upstream 'rust-v*' | awk -F'refs/tags/' '{print $2}')
-          echo "remote rust-v* tags: $(echo "$ALL" | wc -l | tr -d ' ')"
-          TAG=$(echo "$ALL" | { grep -vE -- '-(alpha|beta|rc)' || true; } | sort -V | tail -1)
+          TAG=$(echo "$ALL" | { grep -E '^rust-v[0-9]+\.[0-9]+\.[0-9]+$' || true; } | sort -V | tail -1)
           [ -n "$TAG" ] || { echo "::error::no stable rust-v* tag found on upstream" ; exit 1; }
-          git fetch --no-tags --quiet upstream tag "$TAG"
-          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           echo "Newest stable upstream tag: $TAG"
+          git fetch --no-tags --quiet upstream tag "$TAG"
+          git fetch --no-tags --quiet upstream main
+          BASE=$(git merge-base upstream/main HEAD)
+          if git merge-base --is-ancestor "$BASE" "$TAG^{commit}"; then
+            # Steady state: the tag contains the mainline our branch sits on —
+            # replay the extension onto the tag.
+            echo "mode=tag"                 >> "$GITHUB_OUTPUT"
+            echo "tag=$TAG"                 >> "$GITHUB_OUTPUT"
+            echo "release=explore-$TAG"     >> "$GITHUB_OUTPUT"
+          else
+            # No stable tag contains our base yet (branch rides newer mainline):
+            # the branch itself IS base+extension — build it as-is.
+            SHORT=$(git rev-parse --short HEAD)
+            echo "tag $TAG is older than the branch base ($BASE) — building branch HEAD ($SHORT)"
+            echo "mode=branch"                   >> "$GITHUB_OUTPUT"
+            echo "tag=$TAG"                      >> "$GITHUB_OUTPUT"
+            echo "release=explore-main-$SHORT"   >> "$GITHUB_OUTPUT"
+          fi
 
-      - name: Skip if this tag is already released
+      - name: Skip if already released
         id: gate
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          if gh release view "explore-${{ steps.tag.outputs.tag }}" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            echo "explore-${{ steps.tag.outputs.tag }} already released — nothing to do."
+          if gh release view "${{ steps.tag.outputs.release }}" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "${{ steps.tag.outputs.release }} already released — nothing to do."
             echo "skip=true" >> "$GITHUB_OUTPUT"
           else
             echo "skip=false" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Replay explore commits onto the tag
-        if: steps.gate.outputs.skip == 'false'
+        if: steps.gate.outputs.skip == 'false' && steps.tag.outputs.mode == 'tag'
         run: |
           git config user.name  "codex-explore-bot"
           git config user.email "codex-explore-bot@users.noreply.github.com"
           # Everything this branch carries that upstream/main does not:
           # the Explore extension commit(s) and this workflow.
-          git fetch upstream main --quiet
           PICKS=$(git rev-list --reverse upstream/main..HEAD)
           echo "Cherry-picking:"; git log --oneline upstream/main..HEAD
-          git checkout -b "build/explore-${{ steps.tag.outputs.tag }}" "${{ steps.tag.outputs.tag }}"
+          git checkout -b "build/${{ steps.tag.outputs.release }}" "${{ steps.tag.outputs.tag }}"
           git cherry-pick $PICKS || {
             echo '::error::Cherry-pick conflict — the extension needs a manual rebase onto ${{ steps.tag.outputs.tag }}. Current install stays untouched.'
             exit 1
           }
+
+      - name: Use branch HEAD as build tree
+        if: steps.gate.outputs.skip == 'false' && steps.tag.outputs.mode == 'branch'
+        run: git checkout -b "build/${{ steps.tag.outputs.release }}"
 
       - uses: dtolnay/rust-toolchain@stable
         if: steps.gate.outputs.skip == 'false'
@@ -98,7 +118,7 @@ jobs:
         if: steps.gate.outputs.skip == 'false'
         id: pkg
         run: |
-          NAME="codex-explore-${{ steps.tag.outputs.tag }}-aarch64-apple-darwin"
+          NAME="codex-${{ steps.tag.outputs.release }}-aarch64-apple-darwin"
           mkdir -p dist
           cp codex-rs/target/release/codex "dist/codex-explore"
           tar -czf "dist/${NAME}.tar.gz" -C dist codex-explore
@@ -107,17 +127,17 @@ jobs:
 
       - name: Push built branch (audit trail)
         if: steps.gate.outputs.skip == 'false'
-        run: git push origin "build/explore-${{ steps.tag.outputs.tag }}"
+        run: git push origin "build/${{ steps.tag.outputs.release }}"
 
       - name: Release
         if: steps.gate.outputs.skip == 'false'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "explore-${{ steps.tag.outputs.tag }}" \
+          gh release create "${{ steps.tag.outputs.release }}" \
             --repo "$GITHUB_REPOSITORY" \
-            --target "build/explore-${{ steps.tag.outputs.tag }}" \
-            --title "codex-explore on ${{ steps.tag.outputs.tag }}" \
-            --notes "Explore-mode build on upstream ${{ steps.tag.outputs.tag }} (aarch64-apple-darwin). Mini: download, verify sha256, smoke test, swap symlink." \
+            --target "build/${{ steps.tag.outputs.release }}" \
+            --title "codex-explore ${{ steps.tag.outputs.release }} (${{ steps.tag.outputs.mode }} build)" \
+            --notes "Explore-mode build, mode=${{ steps.tag.outputs.mode }} (newest stable upstream tag at build time: ${{ steps.tag.outputs.tag }}). aarch64-apple-darwin. Mini: download, verify sha256, smoke test, swap symlink." \
             "dist/${{ steps.pkg.outputs.name }}.tar.gz" \
             "dist/${{ steps.pkg.outputs.name }}.tar.gz.sha256"
