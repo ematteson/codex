@@ -24,6 +24,10 @@ jobs:
     if: github.repository == 'ematteson/codex'
     runs-on: macos-14   # Apple Silicon (aarch64-apple-darwin)
     timeout-minutes: 180
+    env:
+      # chromium.googlesource submodule fetches fail via libgit2 on the runner
+      # (SecureTransport errors) — system git handles them fine.
+      CARGO_NET_GIT_FETCH_WITH_CLI: "true"
     defaults:
       run:
         shell: bash
