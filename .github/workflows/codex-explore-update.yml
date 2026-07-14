@@ -1,0 +1,119 @@
+name: codex-explore-update
+
+# Fork-only maintenance loop for codex-explore (Eric's Explore-mode build).
+# Weekly: find the newest stable upstream release tag, replay every commit
+# this branch carries on top of upstream/main (the Explore extension + this
+# workflow) onto that tag, build for Apple Silicon, and publish the binary
+# as a release on this fork. The Mac mini polls releases and does the
+# smoke-test + symlink swap locally — CI builds, the box that runs it promotes.
+
+on:
+  schedule:
+    - cron: '0 3 * * 1'   # Mondays 03:00 UTC
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+concurrency:
+  group: codex-explore-update
+  cancel-in-progress: false
+
+jobs:
+  build:
+    if: github.repository == 'ematteson/codex'
+    runs-on: macos-14   # Apple Silicon (aarch64-apple-darwin)
+    timeout-minutes: 180
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: codex-explore-mainline
+          fetch-depth: 0
+
+      - name: Find newest stable upstream tag
+        id: tag
+        run: |
+          git remote add upstream https://github.com/openai/codex.git
+          git fetch upstream --tags --quiet
+          TAG=$(git tag -l 'rust-v*' | grep -vE -- '-(alpha|beta|rc)' | sort -V | tail -1)
+          [ -n "$TAG" ] || { echo "no stable rust-v* tag found" >&2; exit 1; }
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "Newest stable upstream tag: $TAG"
+
+      - name: Skip if this tag is already released
+        id: gate
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "explore-${{ steps.tag.outputs.tag }}" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "explore-${{ steps.tag.outputs.tag }} already released — nothing to do."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Replay explore commits onto the tag
+        if: steps.gate.outputs.skip == 'false'
+        run: |
+          git config user.name  "codex-explore-bot"
+          git config user.email "codex-explore-bot@users.noreply.github.com"
+          # Everything this branch carries that upstream/main does not:
+          # the Explore extension commit(s) and this workflow.
+          git fetch upstream main --quiet
+          PICKS=$(git rev-list --reverse upstream/main..HEAD)
+          echo "Cherry-picking:"; git log --oneline upstream/main..HEAD
+          git checkout -b "build/explore-${{ steps.tag.outputs.tag }}" "${{ steps.tag.outputs.tag }}"
+          git cherry-pick $PICKS || {
+            echo '::error::Cherry-pick conflict — the extension needs a manual rebase onto ${{ steps.tag.outputs.tag }}. Current install stays untouched.'
+            exit 1
+          }
+
+      - uses: dtolnay/rust-toolchain@stable
+        if: steps.gate.outputs.skip == 'false'
+
+      - uses: Swatinem/rust-cache@v2
+        if: steps.gate.outputs.skip == 'false'
+        with:
+          workspaces: codex-rs
+
+      - name: Build (release)
+        if: steps.gate.outputs.skip == 'false'
+        working-directory: codex-rs
+        run: cargo build --release --bin codex
+
+      - name: Smoke test
+        if: steps.gate.outputs.skip == 'false'
+        run: |
+          ./codex-rs/target/release/codex --version
+          ./codex-rs/target/release/codex --help >/dev/null
+
+      - name: Package
+        if: steps.gate.outputs.skip == 'false'
+        id: pkg
+        run: |
+          NAME="codex-explore-${{ steps.tag.outputs.tag }}-aarch64-apple-darwin"
+          mkdir -p dist
+          cp codex-rs/target/release/codex "dist/codex-explore"
+          tar -czf "dist/${NAME}.tar.gz" -C dist codex-explore
+          shasum -a 256 "dist/${NAME}.tar.gz" > "dist/${NAME}.tar.gz.sha256"
+          echo "name=$NAME" >> "$GITHUB_OUTPUT"
+
+      - name: Push built branch (audit trail)
+        if: steps.gate.outputs.skip == 'false'
+        run: git push origin "build/explore-${{ steps.tag.outputs.tag }}"
+
+      - name: Release
+        if: steps.gate.outputs.skip == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "explore-${{ steps.tag.outputs.tag }}" \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "build/explore-${{ steps.tag.outputs.tag }}" \
+            --title "codex-explore on ${{ steps.tag.outputs.tag }}" \
+            --notes "Explore-mode build on upstream ${{ steps.tag.outputs.tag }} (aarch64-apple-darwin). Mini: download, verify sha256, smoke test, swap symlink." \
+            "dist/${{ steps.pkg.outputs.name }}.tar.gz" \
+            "dist/${{ steps.pkg.outputs.name }}.tar.gz.sha256"
