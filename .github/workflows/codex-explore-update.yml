@@ -85,10 +85,18 @@ jobs:
         run: |
           git config user.name  "codex-explore-bot"
           git config user.email "codex-explore-bot@users.noreply.github.com"
-          # Everything this branch carries that upstream/main does not:
-          # the Explore extension commit(s) and this workflow.
-          PICKS=$(git rev-list --reverse upstream/main..HEAD)
-          echo "Cherry-picking:"; git log --oneline upstream/main..HEAD
+          # Everything this branch carries that the target tag does not: the
+          # Explore extension commit(s), this workflow, install-explore.sh.
+          #
+          # Range against the TAG, not upstream/main: upstream cuts release
+          # commits off main, so a tagged commit is not reachable from
+          # upstream/main and `upstream/main..HEAD` includes the tag commit
+          # itself once this branch is rebased onto a tag — cherry-picking that
+          # onto the same tag is empty and aborts the run. The mode=tag gate
+          # already proved the tag contains this branch's base, so TAG..HEAD is
+          # exactly the carried commits.
+          PICKS=$(git rev-list --reverse "${{ steps.tag.outputs.tag }}..HEAD")
+          echo "Cherry-picking:"; git log --oneline "${{ steps.tag.outputs.tag }}..HEAD"
           git checkout -b "build/${{ steps.tag.outputs.release }}" "${{ steps.tag.outputs.tag }}"
           git cherry-pick $PICKS || {
             echo '::error::Cherry-pick conflict — the extension needs a manual rebase onto ${{ steps.tag.outputs.tag }}. Current install stays untouched.'
