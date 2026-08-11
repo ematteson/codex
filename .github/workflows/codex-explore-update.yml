@@ -129,11 +129,32 @@ jobs:
       - name: Package
         if: steps.gate.outputs.skip == 'false'
         id: pkg
+        env:
+          GH_TOKEN: ${{ github.token }}   # needed for the upstream asset download
         run: |
           NAME="codex-${{ steps.tag.outputs.release }}-aarch64-apple-darwin"
+          HOST=codex-code-mode-host
+          TARGET=aarch64-apple-darwin
           mkdir -p dist
           cp codex-rs/target/release/codex "dist/codex-explore"
-          tar -czf "dist/${NAME}.tar.gz" -C dist codex-explore
+          # Since 0.147.0 Codex shells out to a code-mode host helper, resolved
+          # as a sibling of current_exe; without it every agent command fails
+          # with "failed to spawn code-mode host: host executable was not
+          # found". It cannot be built here — code-mode-runtime needs
+          # v8/v8_enable_sandbox and rusty_v8 publishes no ptrcomp_sandbox
+          # prebuilt for aarch64-apple-darwin (404; V8_FROM_SOURCE=1 only).
+          # Ship upstream's official artifact for the tag we built against —
+          # the fork does not patch that crate.
+          gh release download "${{ steps.tag.outputs.tag }}" --repo openai/codex \
+            --pattern "$HOST-$TARGET.tar.gz" --dir dist --clobber
+          tar -xzf "dist/$HOST-$TARGET.tar.gz" -C dist
+          mv -f "dist/$HOST-$TARGET" "dist/$HOST"
+          chmod +x "dist/$HOST"
+          rm -f "dist/$HOST-$TARGET.tar.gz"
+          "dist/$HOST" --help >/dev/null
+          # Both members: the consumer must install the helper next to the
+          # codex-explore symlink, not only the binary it points at.
+          tar -czf "dist/${NAME}.tar.gz" -C dist codex-explore "$HOST"
           shasum -a 256 "dist/${NAME}.tar.gz" > "dist/${NAME}.tar.gz.sha256"
           echo "name=$NAME" >> "$GITHUB_OUTPUT"
 
