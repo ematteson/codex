@@ -46,8 +46,15 @@ fn explore_preset() -> CollaborationModeMask {
     CollaborationModeMask {
         name: ModeKind::Explore.display_name().to_string(),
         mode: Some(ModeKind::Explore),
+        // Deliberately None: Explore inherits whatever frontier model the user
+        // has selected. Pinning a model here would silently override that.
         model: None,
-        reasoning_effort: Some(Some(ReasoningEffort::High)),
+        // XHigh, one step above Plan's Medium and the old High: exploration is
+        // the mode where depth of reasoning is the point, and every model in
+        // the current catalog supports it. Upstream guidance warns against
+        // assuming more effort is always better, so this is a knob to re-test,
+        // not a permanent truth.
+        reasoning_effort: Some(Some(ReasoningEffort::XHigh)),
         developer_instructions: Some(Some(COLLABORATION_MODE_EXPLORE.to_string())),
     }
 }

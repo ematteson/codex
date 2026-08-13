@@ -159,3 +159,73 @@ fn collaboration_mode_state(mode: ModeKind, instructions: &str) -> Collaboration
         /*catalog_messages*/ None,
     )
 }
+
+/// Every TUI-selectable mode must deliver its own template as the
+/// `<collaboration_mode>` developer block. This is the wiring the TUI relies on:
+/// preset mask -> CollaborationMode settings -> world-state section -> fragment.
+#[test]
+fn each_builtin_preset_renders_its_own_template() {
+    use codex_models_manager::collaboration_mode_presets::builtin_collaboration_mode_presets;
+
+    let expected_heading = |mode: ModeKind| match mode {
+        ModeKind::Plan => "# Plan Mode (Conversational)",
+        ModeKind::Default => "# Collaboration Mode: Default",
+        ModeKind::Explore => "# Collaboration Mode: Explore",
+    };
+
+    let presets = builtin_collaboration_mode_presets();
+    assert_eq!(presets.len(), 3, "one preset per TUI-visible mode");
+
+    for mask in presets {
+        let mode = mask.mode.expect("preset carries a mode");
+        let applied = collaboration_mode(ModeKind::Default, None).apply_mask(&mask);
+        assert_eq!(applied.mode, mode, "mask sets the mode");
+
+        let rendered = CollaborationModeState::from_collaboration_mode(
+            &applied,
+            /*catalog_messages*/ None,
+        )
+        .render_diff(PreviousSectionState::Absent)
+        .expect("mode instructions must be emitted")
+        .render();
+
+        assert!(
+            rendered.starts_with(COLLABORATION_MODE_OPEN_TAG)
+                && rendered.ends_with(COLLABORATION_MODE_CLOSE_TAG),
+            "{mode:?} instructions must be wrapped in collaboration_mode tags"
+        );
+        assert!(
+            rendered.contains(expected_heading(mode)),
+            "{mode:?} must render its own template, got: {}",
+            &rendered[..rendered.len().min(120)]
+        );
+        for other in [ModeKind::Plan, ModeKind::Default, ModeKind::Explore] {
+            if other != mode {
+                assert!(
+                    !rendered.contains(expected_heading(other)),
+                    "{mode:?} must not leak the {other:?} template"
+                );
+            }
+        }
+    }
+}
+
+/// `CollaborationModeMessages` has no Explore field, so the backend catalog can
+/// neither override nor (with an empty string) suppress Explore's instructions
+/// the way it can for Default and Plan. Explore is always locally defined.
+#[test]
+fn explore_ignores_catalog_messages() {
+    let messages = CollaborationModeMessages {
+        default: Some(String::new()),
+        plan: Some(String::new()),
+    };
+    let state = CollaborationModeState::from_collaboration_mode(
+        &collaboration_mode(ModeKind::Explore, Some("local explore instructions")),
+        Some(&messages),
+    );
+
+    assert_eq!(
+        state.instructions.as_deref(),
+        Some("local explore instructions")
+    );
+}

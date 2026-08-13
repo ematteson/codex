@@ -4169,6 +4169,9 @@ and ask before writing. Project-specific decisions stay in the notebook.\n";
 /// `.codex/notebook/` exists upward from `cwd` or when the directory exists
 /// but has no INDEX.md yet. Read errors are swallowed (logged) so a malformed
 /// notebook can never block session start.
+/// Heading the notebook writer places at the top of `INDEX.md`.
+const NOTEBOOK_INDEX_HEADING: &str = "# Notebook Index";
+
 fn build_notebook_developer_instructions(cwd: &std::path::Path) -> Option<String> {
     let root = discover_notebook_root(cwd)?;
     let index = match load_index(&root) {
@@ -4182,9 +4185,16 @@ fn build_notebook_developer_instructions(cwd: &std::path::Path) -> Option<String
             return None;
         }
     };
-    let mut out = String::with_capacity(index.raw.len() + 256);
-    out.push_str("# Notebook Index\n\n");
-    out.push_str(index.raw.trim_end());
+    // INDEX.md conventionally opens with this heading (the notebook writer emits
+    // it), so only add one when the file does not already carry it — otherwise
+    // the block starts with the heading twice.
+    let raw = index.raw.trim();
+    let mut out = String::with_capacity(raw.len() + 256);
+    if !raw.starts_with(NOTEBOOK_INDEX_HEADING) {
+        out.push_str(NOTEBOOK_INDEX_HEADING);
+        out.push_str("\n\n");
+    }
+    out.push_str(raw);
     out.push_str(
         "\n\nThe notebook lives at `.codex/notebook/` (committed) and \
          `.codex/scratch/` (gitignored). When this session relates to an \

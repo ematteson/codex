@@ -11735,3 +11735,46 @@ async fn session_start_hooks_require_project_trust_without_config_toml() -> std:
 
     Ok(())
 }
+
+#[test]
+fn notebook_developer_instructions_do_not_duplicate_the_index_heading() {
+    let tmp = tempfile::tempdir().expect("temp dir");
+    let notebook = tmp.path().join(".codex").join("notebook");
+    std::fs::create_dir_all(&notebook).expect("notebook dir");
+    std::fs::write(
+        notebook.join("INDEX.md"),
+        "# Notebook Index\n\n## Active\n- [topic](topic.md) — Goal: check wiring.\n",
+    )
+    .expect("write index");
+
+    let prompt = super::build_notebook_developer_instructions(tmp.path())
+        .expect("notebook instructions when an index exists");
+
+    assert_eq!(
+        prompt.matches("# Notebook Index").count(),
+        1,
+        "index heading must appear exactly once, got:\n{prompt}"
+    );
+    assert!(prompt.contains("- [topic](topic.md)"), "index body included");
+    assert!(
+        prompt.contains(".codex/scratch/"),
+        "usage guidance appended"
+    );
+}
+
+#[test]
+fn notebook_developer_instructions_add_heading_when_index_lacks_one() {
+    let tmp = tempfile::tempdir().expect("temp dir");
+    let notebook = tmp.path().join(".codex").join("notebook");
+    std::fs::create_dir_all(&notebook).expect("notebook dir");
+    std::fs::write(notebook.join("INDEX.md"), "## Active\n- [t](t.md) — Goal: x.\n")
+        .expect("write index");
+
+    let prompt = super::build_notebook_developer_instructions(tmp.path())
+        .expect("notebook instructions when an index exists");
+
+    assert!(
+        prompt.starts_with("# Notebook Index\n\n## Active"),
+        "heading is supplied for a bare index, got:\n{prompt}"
+    );
+}

@@ -16,7 +16,7 @@ fn preset_names_use_mode_display_names() {
     assert_eq!(explore_preset().model, None);
     assert_eq!(
         explore_preset().reasoning_effort,
-        Some(Some(ReasoningEffort::High))
+        Some(Some(ReasoningEffort::XHigh))
     );
 }
 
@@ -28,12 +28,34 @@ fn explore_preset_uses_explore_template() {
         .expect("explore instructions should be set");
     let normalized = instructions.split_whitespace().collect::<Vec<_>>().join(" ");
     assert!(normalized.contains("Collaboration Mode: Explore"));
-    assert!(normalized.contains("Do not modify product or source files"));
+    // Boundaries: read-only, notebook-only writes, no silent implementation.
+    assert!(normalized.contains("Do not implement"));
     assert!(normalized.contains(".codex/notebook/"));
     assert!(normalized.contains("execution-ready handoff"));
-    assert!(normalized.contains("Generative exploration"));
-    assert!(normalized.contains("Reflective exploration"));
-    assert!(normalized.contains("Exploration does not always need to converge"));
+    // The four properties this mode exists for. Each is a behaviour, not a
+    // phrase — reword freely, but do not drop one silently.
+    assert!(normalized.contains("Truth-seeking"), "truth-seeking section");
+    assert!(
+        normalized.contains("Prefer the check that could disconfirm you"),
+        "falsification bias"
+    );
+    assert!(normalized.contains("Candour"), "anti-sycophancy section");
+    assert!(
+        normalized.contains("Disagree when the evidence points the other way"),
+        "willingness to disagree"
+    );
+    assert!(
+        normalized.contains("are claims, not facts"),
+        "cross-checking other agents' work"
+    );
+    assert!(
+        normalized.contains("breadth for its own sake is noise"),
+        "generative exploration guidance"
+    );
+    assert!(
+        normalized.contains("Exploration need not converge"),
+        "no forced convergence"
+    );
 }
 
 #[test]
